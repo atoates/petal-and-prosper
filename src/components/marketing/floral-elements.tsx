@@ -9,31 +9,31 @@ export function FloralLeaf({ className = "" }: { className?: string }) {
       <path
         d="M60 10C60 10 20 60 20 120C20 160 40 190 60 190C80 190 100 160 100 120C100 60 60 10 60 10Z"
         fill="currentColor"
-        opacity="0.15"
+        opacity="0.35"
       />
       <path
         d="M60 30V180"
         stroke="currentColor"
-        strokeWidth="1.5"
-        opacity="0.2"
+        strokeWidth="2"
+        opacity="0.45"
       />
       <path
         d="M60 60C45 70 30 90 28 110"
         stroke="currentColor"
-        strokeWidth="1"
-        opacity="0.15"
+        strokeWidth="1.5"
+        opacity="0.3"
       />
       <path
         d="M60 80C75 90 90 105 92 120"
         stroke="currentColor"
-        strokeWidth="1"
-        opacity="0.15"
+        strokeWidth="1.5"
+        opacity="0.3"
       />
       <path
         d="M60 110C42 120 32 140 30 155"
         stroke="currentColor"
-        strokeWidth="1"
-        opacity="0.15"
+        strokeWidth="1.5"
+        opacity="0.3"
       />
     </svg>
   );
@@ -48,47 +48,47 @@ export function FloralPetal({ className = "" }: { className?: string }) {
       className={className}
     >
       {/* Centre */}
-      <circle cx="100" cy="100" r="12" fill="currentColor" opacity="0.2" />
+      <circle cx="100" cy="100" r="14" fill="currentColor" opacity="0.4" />
       {/* Petals */}
-      <ellipse cx="100" cy="55" rx="18" ry="35" fill="currentColor" opacity="0.12" />
-      <ellipse cx="100" cy="145" rx="18" ry="35" fill="currentColor" opacity="0.12" />
-      <ellipse cx="55" cy="100" rx="35" ry="18" fill="currentColor" opacity="0.12" />
-      <ellipse cx="145" cy="100" rx="35" ry="18" fill="currentColor" opacity="0.12" />
+      <ellipse cx="100" cy="52" rx="20" ry="38" fill="currentColor" opacity="0.25" />
+      <ellipse cx="100" cy="148" rx="20" ry="38" fill="currentColor" opacity="0.25" />
+      <ellipse cx="52" cy="100" rx="38" ry="20" fill="currentColor" opacity="0.25" />
+      <ellipse cx="148" cy="100" rx="38" ry="20" fill="currentColor" opacity="0.25" />
       <ellipse
-        cx="68"
-        cy="68"
-        rx="18"
-        ry="35"
+        cx="66"
+        cy="66"
+        rx="20"
+        ry="38"
         fill="currentColor"
-        opacity="0.1"
-        transform="rotate(-45 68 68)"
+        opacity="0.2"
+        transform="rotate(-45 66 66)"
       />
       <ellipse
-        cx="132"
-        cy="68"
-        rx="18"
-        ry="35"
+        cx="134"
+        cy="66"
+        rx="20"
+        ry="38"
         fill="currentColor"
-        opacity="0.1"
-        transform="rotate(45 132 68)"
+        opacity="0.2"
+        transform="rotate(45 134 66)"
       />
       <ellipse
-        cx="68"
-        cy="132"
-        rx="18"
-        ry="35"
+        cx="66"
+        cy="134"
+        rx="20"
+        ry="38"
         fill="currentColor"
-        opacity="0.1"
-        transform="rotate(45 68 132)"
+        opacity="0.2"
+        transform="rotate(45 66 134)"
       />
       <ellipse
-        cx="132"
-        cy="132"
-        rx="18"
-        ry="35"
+        cx="134"
+        cy="134"
+        rx="20"
+        ry="38"
         fill="currentColor"
-        opacity="0.1"
-        transform="rotate(-45 132 132)"
+        opacity="0.2"
+        transform="rotate(-45 134 134)"
       />
     </svg>
   );
@@ -106,46 +106,46 @@ export function FloralBranch({ className = "" }: { className?: string }) {
       <path
         d="M150 20C150 20 140 100 145 200C148 260 155 340 160 380"
         stroke="currentColor"
-        strokeWidth="2"
-        opacity="0.15"
+        strokeWidth="3"
+        opacity="0.3"
       />
       {/* Left leaves */}
       <path
         d="M145 80C145 80 100 60 80 80C60 100 90 110 145 100"
         fill="currentColor"
-        opacity="0.1"
+        opacity="0.25"
       />
       <path
         d="M146 160C146 160 95 130 70 155C45 180 85 195 146 175"
         fill="currentColor"
-        opacity="0.1"
+        opacity="0.25"
       />
       <path
         d="M150 260C150 260 100 235 78 258C56 281 95 295 150 275"
         fill="currentColor"
-        opacity="0.1"
+        opacity="0.25"
       />
       {/* Right leaves */}
       <path
         d="M148 120C148 120 195 95 215 118C235 141 200 150 148 138"
         fill="currentColor"
-        opacity="0.1"
+        opacity="0.25"
       />
       <path
         d="M150 210C150 210 200 185 222 208C244 231 205 245 150 225"
         fill="currentColor"
-        opacity="0.1"
+        opacity="0.25"
       />
       <path
         d="M155 310C155 310 205 290 222 310C239 330 205 342 155 325"
         fill="currentColor"
-        opacity="0.1"
+        opacity="0.25"
       />
       {/* Small buds */}
-      <circle cx="80" cy="78" r="5" fill="currentColor" opacity="0.15" />
-      <circle cx="215" cy="116" r="5" fill="currentColor" opacity="0.15" />
-      <circle cx="70" cy="153" r="6" fill="currentColor" opacity="0.15" />
-      <circle cx="222" cy="206" r="5" fill="currentColor" opacity="0.15" />
+      <circle cx="80" cy="78" r="6" fill="currentColor" opacity="0.35" />
+      <circle cx="215" cy="116" r="6" fill="currentColor" opacity="0.35" />
+      <circle cx="70" cy="153" r="7" fill="currentColor" opacity="0.35" />
+      <circle cx="222" cy="206" r="6" fill="currentColor" opacity="0.35" />
     </svg>
   );
 }
@@ -160,32 +160,32 @@ export function FloralRose({ className = "" }: { className?: string }) {
     >
       {/* Outer petals */}
       <path
-        d="M80 20C80 20 40 30 30 60C20 90 50 100 80 80C110 100 140 90 130 60C120 30 80 20 80 20Z"
+        d="M80 15C80 15 35 28 25 62C15 96 50 108 80 85C110 108 145 96 135 62C125 28 80 15 80 15Z"
         fill="currentColor"
-        opacity="0.08"
+        opacity="0.18"
       />
       <path
-        d="M80 140C80 140 40 130 30 100C20 70 50 60 80 80C110 60 140 70 130 100C120 130 80 140 80 140Z"
+        d="M80 145C80 145 35 132 25 98C15 64 50 52 80 75C110 52 145 64 135 98C125 132 80 145 80 145Z"
         fill="currentColor"
-        opacity="0.08"
+        opacity="0.18"
       />
       <path
-        d="M20 80C20 80 30 40 60 30C90 20 100 50 80 80C100 110 90 140 60 130C30 120 20 80 20 80Z"
+        d="M15 80C15 80 28 35 62 25C96 15 108 50 85 80C108 110 96 145 62 135C28 125 15 80 15 80Z"
         fill="currentColor"
-        opacity="0.08"
+        opacity="0.18"
       />
       <path
-        d="M140 80C140 80 130 40 100 30C70 20 60 50 80 80C60 110 70 140 100 130C130 120 140 80 140 80Z"
+        d="M145 80C145 80 132 35 98 25C64 15 52 50 75 80C52 110 64 145 98 135C132 125 145 80 145 80Z"
         fill="currentColor"
-        opacity="0.08"
+        opacity="0.18"
       />
       {/* Inner spiral */}
       <path
-        d="M80 55C80 55 65 60 62 72C59 84 70 88 80 80C90 88 101 84 98 72C95 60 80 55 80 55Z"
+        d="M80 50C80 50 60 58 56 72C52 86 66 92 80 82C94 92 108 86 104 72C100 58 80 50 80 50Z"
         fill="currentColor"
-        opacity="0.12"
+        opacity="0.28"
       />
-      <circle cx="80" cy="80" r="8" fill="currentColor" opacity="0.18" />
+      <circle cx="80" cy="80" r="10" fill="currentColor" opacity="0.4" />
     </svg>
   );
 }
@@ -199,19 +199,19 @@ export function FloralDivider({ className = "" }: { className?: string }) {
       className={className}
     >
       {/* Centre flower */}
-      <circle cx="200" cy="20" r="6" fill="currentColor" opacity="0.2" />
-      <ellipse cx="200" cy="8" rx="5" ry="10" fill="currentColor" opacity="0.12" />
-      <ellipse cx="200" cy="32" rx="5" ry="10" fill="currentColor" opacity="0.12" />
-      <ellipse cx="188" cy="20" rx="10" ry="5" fill="currentColor" opacity="0.12" />
-      <ellipse cx="212" cy="20" rx="10" ry="5" fill="currentColor" opacity="0.12" />
+      <circle cx="200" cy="20" r="7" fill="currentColor" opacity="0.4" />
+      <ellipse cx="200" cy="6" rx="6" ry="12" fill="currentColor" opacity="0.25" />
+      <ellipse cx="200" cy="34" rx="6" ry="12" fill="currentColor" opacity="0.25" />
+      <ellipse cx="186" cy="20" rx="12" ry="6" fill="currentColor" opacity="0.25" />
+      <ellipse cx="214" cy="20" rx="12" ry="6" fill="currentColor" opacity="0.25" />
       {/* Lines out */}
-      <line x1="230" y1="20" x2="380" y2="20" stroke="currentColor" strokeWidth="1" opacity="0.15" />
-      <line x1="20" y1="20" x2="170" y2="20" stroke="currentColor" strokeWidth="1" opacity="0.15" />
+      <line x1="232" y1="20" x2="390" y2="20" stroke="currentColor" strokeWidth="1.5" opacity="0.3" />
+      <line x1="10" y1="20" x2="168" y2="20" stroke="currentColor" strokeWidth="1.5" opacity="0.3" />
       {/* Small leaves on lines */}
-      <ellipse cx="280" cy="20" rx="8" ry="4" fill="currentColor" opacity="0.08" transform="rotate(-20 280 20)" />
-      <ellipse cx="340" cy="20" rx="6" ry="3" fill="currentColor" opacity="0.08" transform="rotate(15 340 20)" />
-      <ellipse cx="120" cy="20" rx="8" ry="4" fill="currentColor" opacity="0.08" transform="rotate(20 120 20)" />
-      <ellipse cx="60" cy="20" rx="6" ry="3" fill="currentColor" opacity="0.08" transform="rotate(-15 60 20)" />
+      <ellipse cx="280" cy="20" rx="10" ry="5" fill="currentColor" opacity="0.2" transform="rotate(-20 280 20)" />
+      <ellipse cx="345" cy="20" rx="8" ry="4" fill="currentColor" opacity="0.2" transform="rotate(15 345 20)" />
+      <ellipse cx="120" cy="20" rx="10" ry="5" fill="currentColor" opacity="0.2" transform="rotate(20 120 20)" />
+      <ellipse cx="55" cy="20" rx="8" ry="4" fill="currentColor" opacity="0.2" transform="rotate(-15 55 20)" />
     </svg>
   );
 }

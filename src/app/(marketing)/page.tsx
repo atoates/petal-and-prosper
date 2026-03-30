@@ -24,37 +24,14 @@ import {
 export default function Home() {
   return (
     <>
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white bg-opacity-90 backdrop-blur-md border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center gap-2 font-serif font-bold text-xl text-[#1B4332]">
-            <Flower className="text-[#D4A0A7]" size={24} />
-            Petal & Prosper
-          </Link>
-          <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-sm text-gray-600 hover:text-[#2D6A4F] transition-colors">Features</a>
-            <a href="#pricing" className="text-sm text-gray-600 hover:text-[#2D6A4F] transition-colors">Pricing</a>
-            <a href="#faqs" className="text-sm text-gray-600 hover:text-[#2D6A4F] transition-colors">FAQs</a>
-            <Link href="/login" className="text-sm font-medium text-[#2D6A4F] hover:text-[#1B4332] transition-colors">
-              Sign in
-            </Link>
-            <Link href="/signup">
-              <Button variant="primary" size="sm" className="bg-[#2D6A4F] hover:bg-[#1B4332] text-white">
-                Start free trial
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </nav>
-
       {/* Hero Section */}
       <section className="relative pt-32 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden bg-gradient-to-br from-[#FFF8F0] via-[#FAF3E0] to-[#f5e0e3]">
         {/* Botanical decorative elements */}
-        <FloralBranch className="absolute top-0 left-0 w-48 md:w-72 h-auto text-[#2D6A4F] opacity-60 -translate-x-8" />
-        <FloralBranch className="absolute top-0 right-0 w-48 md:w-72 h-auto text-[#D4A0A7] opacity-50 translate-x-8 scale-x-[-1]" />
-        <FloralRose className="absolute bottom-12 left-8 w-32 md:w-48 h-auto text-[#E8B4B8]" />
-        <FloralPetal className="absolute top-24 right-16 w-24 md:w-40 h-auto text-[#C9A96E] opacity-40" />
-        <FloralLeaf className="absolute bottom-0 right-24 w-20 md:w-32 h-auto text-[#2D6A4F] opacity-40 rotate-12" />
+        <FloralBranch className="absolute top-0 left-0 w-56 md:w-80 h-auto text-[#2D6A4F] -translate-x-4" />
+        <FloralBranch className="absolute top-0 right-0 w-56 md:w-80 h-auto text-[#D4A0A7] translate-x-4 scale-x-[-1]" />
+        <FloralRose className="absolute bottom-8 left-6 w-36 md:w-56 h-auto text-[#E8B4B8]" />
+        <FloralPetal className="absolute top-20 right-12 w-28 md:w-44 h-auto text-[#C9A96E]" />
+        <FloralLeaf className="absolute bottom-0 right-20 w-24 md:w-36 h-auto text-[#2D6A4F] rotate-12" />
 
         <div className="max-w-5xl mx-auto text-center relative z-10">
           <div className="mb-8 inline-flex items-center gap-3 px-5 py-3 bg-white bg-opacity-70 backdrop-blur-sm rounded-full border border-[#2D6A4F] border-opacity-20 shadow-sm hover:shadow-md transition-shadow">
@@ -131,9 +108,9 @@ export default function Home() {
 
       {/* Features Section */}
       <section id="features" className="relative py-24 px-4 sm:px-6 lg:px-8 bg-white overflow-hidden">
-        {/* Subtle floral accents */}
-        <FloralLeaf className="absolute top-8 right-0 w-24 h-auto text-[#E8B4B8] opacity-30 rotate-45" />
-        <FloralPetal className="absolute bottom-8 left-0 w-32 h-auto text-[#2D6A4F] opacity-20 -rotate-12" />
+        {/* Floral accents */}
+        <FloralLeaf className="absolute top-8 right-0 w-28 h-auto text-[#E8B4B8] rotate-45" />
+        <FloralPetal className="absolute bottom-8 left-0 w-36 h-auto text-[#2D6A4F] -rotate-12" />
 
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-6">
@@ -211,8 +188,8 @@ export default function Home() {
 
       {/* Dashboard Preview Section */}
       <section className="relative py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-[#FAF3E0] to-white overflow-hidden">
-        <FloralRose className="absolute top-0 right-0 w-40 h-auto text-[#D4A0A7] opacity-30" />
-        <FloralLeaf className="absolute bottom-0 left-4 w-28 h-auto text-[#2D6A4F] opacity-25 -rotate-12" />
+        <FloralRose className="absolute top-0 right-0 w-48 h-auto text-[#D4A0A7]" />
+        <FloralLeaf className="absolute bottom-0 left-4 w-32 h-auto text-[#2D6A4F] -rotate-12" />
 
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
@@ -293,8 +270,8 @@ export default function Home() {
 
       {/* Benefits Section */}
       <section id="benefits" className="relative py-24 px-4 sm:px-6 lg:px-8 bg-[#FFF8F0] border-y border-gray-200 overflow-hidden">
-        <FloralBranch className="absolute top-0 right-0 w-56 h-auto text-[#E8B4B8] opacity-30 scale-x-[-1]" />
-        <FloralPetal className="absolute bottom-12 left-4 w-28 h-auto text-[#C9A96E] opacity-25" />
+        <FloralBranch className="absolute top-0 right-0 w-64 h-auto text-[#E8B4B8] scale-x-[-1]" />
+        <FloralPetal className="absolute bottom-12 left-4 w-32 h-auto text-[#C9A96E]" />
 
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
@@ -329,8 +306,8 @@ export default function Home() {
 
       {/* How It Works Section */}
       <section className="relative py-24 px-4 sm:px-6 lg:px-8 bg-white overflow-hidden">
-        <FloralLeaf className="absolute top-12 left-0 w-20 h-auto text-[#2D6A4F] opacity-20 -rotate-45" />
-        <FloralRose className="absolute bottom-12 right-0 w-32 h-auto text-[#E8B4B8] opacity-20" />
+        <FloralLeaf className="absolute top-12 left-0 w-24 h-auto text-[#2D6A4F] -rotate-45" />
+        <FloralRose className="absolute bottom-12 right-0 w-40 h-auto text-[#E8B4B8]" />
 
         <div className="max-w-5xl mx-auto relative z-10">
           <div className="text-center mb-16">
@@ -382,8 +359,8 @@ export default function Home() {
 
       {/* Pricing Section */}
       <section id="pricing" className="relative py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-white to-[#FAF3E0] overflow-hidden">
-        <FloralBranch className="absolute top-0 left-0 w-48 h-auto text-[#2D6A4F] opacity-20" />
-        <FloralPetal className="absolute bottom-0 right-0 w-36 h-auto text-[#D4A0A7] opacity-20 rotate-45" />
+        <FloralBranch className="absolute top-0 left-0 w-56 h-auto text-[#2D6A4F]" />
+        <FloralPetal className="absolute bottom-0 right-0 w-40 h-auto text-[#D4A0A7] rotate-45" />
 
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
@@ -522,8 +499,8 @@ export default function Home() {
 
       {/* Testimonials Section */}
       <section className="relative py-24 px-4 sm:px-6 lg:px-8 bg-[#FFF8F0] overflow-hidden">
-        <FloralRose className="absolute top-8 left-4 w-36 h-auto text-[#E8B4B8] opacity-25" />
-        <FloralLeaf className="absolute bottom-8 right-8 w-24 h-auto text-[#2D6A4F] opacity-25 rotate-180" />
+        <FloralRose className="absolute top-8 left-4 w-44 h-auto text-[#E8B4B8]" />
+        <FloralLeaf className="absolute bottom-8 right-8 w-28 h-auto text-[#2D6A4F] rotate-180" />
 
         <div className="max-w-6xl mx-auto relative z-10">
           <div className="text-center mb-16">
@@ -581,7 +558,7 @@ export default function Home() {
 
       {/* FAQs Section */}
       <section id="faqs" className="relative py-24 px-4 sm:px-6 lg:px-8 bg-white overflow-hidden">
-        <FloralPetal className="absolute top-16 right-0 w-28 h-auto text-[#C9A96E] opacity-15" />
+        <FloralPetal className="absolute top-16 right-0 w-32 h-auto text-[#C9A96E]" />
 
         <div className="max-w-3xl mx-auto relative z-10">
           <div className="text-center mb-16">
@@ -649,10 +626,10 @@ export default function Home() {
       {/* Final CTA Section */}
       <section className="relative py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-[#2D6A4F] to-[#1B4332] text-white overflow-hidden">
         {/* Floral accents on dark background */}
-        <FloralBranch className="absolute top-0 left-0 w-64 h-auto text-white opacity-[0.06]" />
-        <FloralBranch className="absolute bottom-0 right-0 w-64 h-auto text-white opacity-[0.06] scale-x-[-1] rotate-180" />
-        <FloralRose className="absolute top-8 right-16 w-40 h-auto text-[#C9A96E] opacity-[0.08]" />
-        <FloralPetal className="absolute bottom-8 left-16 w-32 h-auto text-white opacity-[0.06]" />
+        <FloralBranch className="absolute top-0 left-0 w-64 h-auto text-white opacity-20" />
+        <FloralBranch className="absolute bottom-0 right-0 w-64 h-auto text-white opacity-20 scale-x-[-1] rotate-180" />
+        <FloralRose className="absolute top-8 right-16 w-44 h-auto text-[#C9A96E] opacity-30" />
+        <FloralPetal className="absolute bottom-8 left-16 w-36 h-auto text-white opacity-20" />
 
         <div className="max-w-3xl mx-auto text-center relative z-10">
           <FloralDivider className="w-64 h-auto mx-auto text-[#C9A96E] opacity-40 mb-8" />
@@ -675,48 +652,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-[#1B4332] text-gray-300 py-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-12 mb-12">
-            <div>
-              <Link href="/" className="flex items-center gap-2 font-serif font-bold text-xl text-white mb-4">
-                <Flower className="text-[#D4A0A7]" size={22} />
-                Petal & Prosper
-              </Link>
-              <p className="text-sm leading-relaxed text-gray-400">
-                Simple and powerful floristry business management software. Built by florists, for florists.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-serif font-bold text-white mb-4">Product</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="#faqs" className="hover:text-white transition-colors">FAQs</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-serif font-bold text-white mb-4">Company</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-serif font-bold text-white mb-4">Legal</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Terms of Service</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-gray-700 pt-8 text-center text-sm text-gray-500">
-            <p>&copy; 2026 Petal & Prosper. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
     </>
   );
 }
