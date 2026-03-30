@@ -19,21 +19,21 @@ import {
 } from "lucide-react";
 
 const navigationItems = [
-  { name: "Enquiries", href: "/dashboard/enquiries", icon: FileText },
-  { name: "Orders", href: "/dashboard/orders", icon: ShoppingCart },
-  { name: "Pricing", href: "/dashboard/pricing", icon: DollarSign },
-  { name: "Proposals", href: "/dashboard/proposals", icon: FileCheck },
-  { name: "Invoices", href: "/dashboard/invoices", icon: Receipt },
-  { name: "Wholesale", href: "/dashboard/wholesale", icon: Boxes },
-  { name: "Production", href: "/dashboard/production", icon: Wrench },
-  { name: "Delivery", href: "/dashboard/delivery", icon: Truck },
-  { name: "Libraries", href: "/dashboard/libraries", icon: Library },
+  { name: "Enquiries", href: "/enquiries", icon: FileText },
+  { name: "Orders", href: "/orders", icon: ShoppingCart },
+  { name: "Pricing", href: "/pricing", icon: DollarSign },
+  { name: "Proposals", href: "/proposals", icon: FileCheck },
+  { name: "Invoices", href: "/invoices", icon: Receipt },
+  { name: "Wholesale", href: "/wholesale", icon: Boxes },
+  { name: "Production", href: "/production", icon: Wrench },
+  { name: "Delivery", href: "/delivery", icon: Truck },
+  { name: "Libraries", href: "/libraries", icon: Library },
 ];
 
 const settingsItems = [
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
-  { name: "Subscription", href: "/dashboard/subscription", icon: CreditCard },
-  { name: "User", href: "/dashboard/user", icon: User },
+  { name: "Settings", href: "/settings", icon: Settings },
+  { name: "Subscription", href: "/subscription", icon: CreditCard },
+  { name: "User", href: "/user", icon: User },
 ];
 
 export function Sidebar() {

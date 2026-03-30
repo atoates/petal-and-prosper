@@ -41,7 +41,7 @@ export default function SignupPage() {
     try {
       // TODO: Implement signup with NextAuth
       console.log("Signup attempt:", formData);
-      router.push("/dashboard/enquiries");
+      router.push("/enquiries");
     } catch (err) {
       setError("Failed to create account. Please try again.");
     } finally {
