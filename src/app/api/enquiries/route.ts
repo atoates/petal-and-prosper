@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { enquiries } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
-
-const COMPANY_ID = "1";
+import { getCompanyId } from "@/lib/api-helpers";
 
 export async function GET(_request: NextRequest) {
   try {
+    const COMPANY_ID = await getCompanyId();
     const result = await db.query.enquiries.findMany({
       where: eq(enquiries.companyId, COMPANY_ID),
       orderBy: desc(enquiries.createdAt),
@@ -24,6 +24,7 @@ export async function GET(_request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const COMPANY_ID = await getCompanyId();
     const body = await request.json();
 
     const {

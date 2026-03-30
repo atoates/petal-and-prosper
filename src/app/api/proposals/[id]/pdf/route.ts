@@ -3,14 +3,14 @@ import { db } from "@/lib/db";
 import { proposals, companies, proposalSettings } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { generateProposalPdf } from "@/lib/pdf/proposal-pdf";
-
-const COMPANY_ID = "1";
+import { getCompanyId } from "@/lib/api-helpers";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const COMPANY_ID = await getCompanyId();
     const { id } = params;
 
     // Fetch proposal with related data

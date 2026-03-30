@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { orders, orderItems } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-
-const COMPANY_ID = "1";
+import { getCompanyId } from "@/lib/api-helpers";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const COMPANY_ID = await getCompanyId();
     const result = await db.query.orders.findFirst({
       where: and(eq(orders.id, params.id), eq(orders.companyId, COMPANY_ID)),
       with: {
@@ -37,6 +37,7 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    const COMPANY_ID = await getCompanyId();
     const body = await request.json();
 
     const { enquiryId, status, version, totalPrice, items } = body;
@@ -131,6 +132,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const COMPANY_ID = await getCompanyId();
     // Delete all order items
     await db.delete(orderItems).where(eq(orderItems.orderId, params.id));
 

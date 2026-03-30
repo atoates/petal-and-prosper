@@ -8,11 +8,11 @@ import {
   addresses,
 } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-
-const COMPANY_ID = "1";
+import { getCompanyId } from "@/lib/api-helpers";
 
 export async function GET(_request: NextRequest) {
   try {
+    const COMPANY_ID = await getCompanyId();
     const companyData = await db.query.companies.findFirst({
       where: eq(companies.id, COMPANY_ID),
     });
@@ -53,6 +53,7 @@ export async function GET(_request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const COMPANY_ID = await getCompanyId();
     const body = await request.json();
 
     const {

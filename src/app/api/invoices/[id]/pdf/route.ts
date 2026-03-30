@@ -3,14 +3,14 @@ import { db } from "@/lib/db";
 import { invoices, companies, invoiceSettings } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { generateInvoicePdf } from "@/lib/pdf/invoice-pdf";
-
-const COMPANY_ID = "1";
+import { getCompanyId } from "@/lib/api-helpers";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const COMPANY_ID = await getCompanyId();
     const { id } = params;
 
     // Fetch invoice with related data

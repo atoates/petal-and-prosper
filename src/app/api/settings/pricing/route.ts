@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { priceSettings } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-
-const COMPANY_ID = "1";
+import { getCompanyId } from "@/lib/api-helpers";
 
 export async function GET(_request: NextRequest) {
   try {
+    const COMPANY_ID = await getCompanyId();
     const result = await db.query.priceSettings.findFirst({
       where: eq(priceSettings.companyId, COMPANY_ID),
     });
@@ -30,6 +30,7 @@ export async function GET(_request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const COMPANY_ID = await getCompanyId();
     const body = await request.json();
 
     const {

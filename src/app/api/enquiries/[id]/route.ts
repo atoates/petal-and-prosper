@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { enquiries, orders } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-
-const COMPANY_ID = "1";
+import { getCompanyId } from "@/lib/api-helpers";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const COMPANY_ID = await getCompanyId();
     const result = await db.query.enquiries.findFirst({
       where: and(eq(enquiries.id, params.id), eq(enquiries.companyId, COMPANY_ID)),
     });
@@ -33,6 +33,7 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    const COMPANY_ID = await getCompanyId();
     const body = await request.json();
 
     const {
@@ -92,6 +93,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const COMPANY_ID = await getCompanyId();
     // First, delete all orders associated with this enquiry
     await db
       .delete(orders)

@@ -13,12 +13,12 @@ import {
 } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
-
-const COMPANY_ID = "1";
+import { getCompanyId } from "@/lib/api-helpers";
 
 // GET: Check demo data status (count records)
 export async function GET(_request: NextRequest) {
   try {
+    const COMPANY_ID = await getCompanyId();
     const [enqCount] = await db
       .select({ count: sql<number>`count(*)` })
       .from(enquiries)
@@ -78,13 +78,14 @@ export async function GET(_request: NextRequest) {
 // POST: Seed demo data or clear data
 export async function POST(request: NextRequest) {
   try {
+    const COMPANY_ID = await getCompanyId();
     const body = await request.json();
     const { action } = body;
 
     if (action === "clear") {
-      return await clearDemoData();
+      return await clearDemoData(COMPANY_ID);
     } else if (action === "seed") {
-      return await seedDemoData();
+      return await seedDemoData(COMPANY_ID);
     } else {
       return NextResponse.json(
         { error: "Invalid action. Use 'seed' or 'clear'." },
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function clearDemoData() {
+async function clearDemoData(COMPANY_ID: string) {
   // Delete in dependency order (children first)
   await db.delete(deliverySchedules).where(eq(deliverySchedules.companyId, COMPANY_ID));
   await db.delete(productionSchedules).where(eq(productionSchedules.companyId, COMPANY_ID));
@@ -128,9 +129,9 @@ async function clearDemoData() {
   });
 }
 
-async function seedDemoData() {
+async function seedDemoData(COMPANY_ID: string) {
   // First clear existing transactional data
-  await clearDemoData();
+  await clearDemoData(COMPANY_ID);
 
   // --- PRODUCTS (67 items) ---
   const productData = [
