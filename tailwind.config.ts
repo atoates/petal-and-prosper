@@ -16,6 +16,10 @@ const config: Config = {
         "light-pink": "#f5e6e3",
         "soft-cream": "#faf8f6",
       },
+      fontFamily: {
+        serif: ["var(--font-serif)", "Georgia", "serif"],
+        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+      },
     },
   },
   plugins: [forms],
