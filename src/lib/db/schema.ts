@@ -53,6 +53,14 @@ export const addressTypeEnum = pgEnum("address_type", [
   "delivery",
   "studio",
 ]);
+export const productCategoryEnum = pgEnum("product_category", [
+  "flower",
+  "foliage",
+  "sundry",
+  "container",
+  "ribbon",
+  "accessory",
+]);
 export const wholesaleStatusEnum = pgEnum("wholesale_status", [
   "pending",
   "confirmed",
@@ -304,6 +312,28 @@ export const subscriptions = pgTable(
   }
 );
 
+export const products = pgTable(
+  "products",
+  {
+    id: text("id").primaryKey(),
+    companyId: text("company_id").notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    category: productCategoryEnum("category").notNull(),
+    subcategory: varchar("subcategory", { length: 100 }),
+    wholesalePrice: decimal("wholesale_price", { precision: 10, scale: 2 }),
+    retailPrice: decimal("retail_price", { precision: 10, scale: 2 }),
+    unit: varchar("unit", { length: 50 }).default("stem"),
+    stemCount: integer("stem_count"),
+    colour: varchar("colour", { length: 100 }),
+    season: varchar("season", { length: 100 }),
+    supplier: varchar("supplier", { length: 255 }),
+    notes: text("notes"),
+    isActive: varchar("is_active", { length: 5 }).default("true"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  }
+);
+
 // Relations
 export const usersRelations = relations(users, ({ one }) => ({
   company: one(companies, {
@@ -322,6 +352,7 @@ export const companiesRelations = relations(companies, ({ many, one }) => ({
   wholesaleOrders: many(wholesaleOrders),
   productionSchedules: many(productionSchedules),
   deliverySchedules: many(deliverySchedules),
+  products: many(products),
   priceSettings: one(priceSettings),
   proposalSettings: one(proposalSettings),
   invoiceSettings: one(invoiceSettings),
@@ -461,6 +492,13 @@ export const invoiceSettingsRelations = relations(
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
   company: one(companies, {
     fields: [subscriptions.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const productsRelations = relations(products, ({ one }) => ({
+  company: one(companies, {
+    fields: [products.companyId],
     references: [companies.id],
   }),
 }));
