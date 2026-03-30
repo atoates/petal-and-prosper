@@ -26,8 +26,8 @@ export const authConfig = {
 
           // Coerce to strings -- server-side signIn can pass values as unknown types
           const raw = {
-            email: String(credentials?.email ?? ""),
-            password: String(credentials?.password ?? ""),
+            email: String(credentials?.email ?? "").trim(),
+            password: String(credentials?.password ?? "").trim(),
           };
           console.log("[auth] parsed email:", raw.email, "password length:", raw.password.length);
 
