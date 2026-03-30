@@ -5,7 +5,7 @@ import { Card, CardHeader, CardBody, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-type SettingsTab = "company" | "pricing" | "proposal" | "invoice" | "addresses" | "demo";
+type SettingsTab = "company" | "pricing" | "proposal" | "invoice" | "addresses";
 
 interface CompanyData {
   id: string;
@@ -62,20 +62,12 @@ export default function SettingsPage() {
   const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings>({});
   const [addresses, setAddresses] = useState<Address[]>([]);
 
-  // Demo data state
-  const [demoStatus, setDemoStatus] = useState<Record<string, number>>({});
-  const [demoLoading, setDemoLoading] = useState(false);
-  const [demoMessage, setDemoMessage] = useState<string | null>(null);
-  const [demoError, setDemoError] = useState<string | null>(null);
-  const [confirmClear, setConfirmClear] = useState(false);
-
   const tabs: { id: SettingsTab; name: string }[] = [
     { id: "company", name: "Company Details" },
     { id: "pricing", name: "Pricing" },
     { id: "proposal", name: "Proposals" },
     { id: "invoice", name: "Invoices" },
     { id: "addresses", name: "Addresses" },
-    { id: "demo", name: "Demo Data" },
   ];
 
   useEffect(() => {
@@ -100,44 +92,7 @@ export default function SettingsPage() {
     };
 
     fetchSettings();
-    fetchDemoStatus();
   }, []);
-
-  const fetchDemoStatus = async () => {
-    try {
-      const response = await fetch("/api/demo-data");
-      if (response.ok) {
-        const data = await response.json();
-        setDemoStatus(data);
-      }
-    } catch {
-      // Silently fail
-    }
-  };
-
-  const handleDemoAction = async (action: "seed" | "clear") => {
-    setDemoLoading(true);
-    setDemoMessage(null);
-    setDemoError(null);
-    setConfirmClear(false);
-    try {
-      const response = await fetch("/api/demo-data", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Something went wrong");
-      }
-      setDemoMessage(data.message);
-      await fetchDemoStatus();
-    } catch (err) {
-      setDemoError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setDemoLoading(false);
-    }
-  };
 
   const handleSave = async () => {
     try {
@@ -536,129 +491,6 @@ export default function SettingsPage() {
             </Card>
           )}
 
-          {activeTab === "demo" && (
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <h2 className="text-xl font-serif font-semibold text-gray-900">
-                    Demo Data Management
-                  </h2>
-                </CardHeader>
-                <CardBody className="space-y-6">
-                  <p className="text-gray-600">
-                    Use these tools to populate your account with realistic sample data for
-                    demonstrations, or to clear it when you are ready to go live with real data.
-                  </p>
-
-                  {/* Current data counts */}
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3 uppercase tracking-wide">
-                      Current Data
-                    </h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      {[
-                        { label: "Enquiries", count: demoStatus.enquiries || 0 },
-                        { label: "Orders", count: demoStatus.orders || 0 },
-                        { label: "Invoices", count: demoStatus.invoices || 0 },
-                        { label: "Proposals", count: demoStatus.proposals || 0 },
-                        { label: "Products", count: demoStatus.products || 0 },
-                        { label: "Wholesale", count: demoStatus.wholesaleOrders || 0 },
-                        { label: "Production", count: demoStatus.productionSchedules || 0 },
-                        { label: "Deliveries", count: demoStatus.deliverySchedules || 0 },
-                      ].map((item) => (
-                        <div
-                          key={item.label}
-                          className="bg-gray-50 rounded-lg p-3 text-center"
-                        >
-                          <p className="text-2xl font-serif font-bold text-[#1B4332]">
-                            {item.count}
-                          </p>
-                          <p className="text-xs text-gray-600">{item.label}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Messages */}
-                  {demoMessage && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                      <p className="text-green-800 text-sm">{demoMessage}</p>
-                    </div>
-                  )}
-                  {demoError && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                      <p className="text-red-800 text-sm">{demoError}</p>
-                    </div>
-                  )}
-                </CardBody>
-                <CardFooter className="flex flex-col sm:flex-row gap-4">
-                  {/* Seed button */}
-                  <Button
-                    variant="primary"
-                    onClick={() => handleDemoAction("seed")}
-                    disabled={demoLoading}
-                    className="bg-[#2D6A4F] hover:bg-[#1B4332] text-white"
-                  >
-                    {demoLoading ? (
-                      <span className="inline-flex items-center gap-2">
-                        <span className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
-                        Processing...
-                      </span>
-                    ) : (
-                      "Load demo data"
-                    )}
-                  </Button>
-
-                  {/* Clear button with confirmation */}
-                  {!confirmClear ? (
-                    <Button
-                      variant="outline"
-                      onClick={() => setConfirmClear(true)}
-                      disabled={demoLoading}
-                      className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800"
-                    >
-                      Clear all data
-                    </Button>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-red-700 font-medium">
-                        Are you sure? This will delete all enquiries, orders, invoices, proposals, products, and schedules.
-                      </span>
-                      <Button
-                        variant="primary"
-                        onClick={() => handleDemoAction("clear")}
-                        disabled={demoLoading}
-                        className="bg-red-600 hover:bg-red-700 text-white"
-                      >
-                        Yes, clear everything
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        onClick={() => setConfirmClear(false)}
-                        disabled={demoLoading}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  )}
-                </CardFooter>
-              </Card>
-
-              <Card className="bg-amber-50 border-amber-200">
-                <CardBody>
-                  <h3 className="text-sm font-semibold text-amber-900 mb-2">
-                    Please note
-                  </h3>
-                  <p className="text-sm text-amber-800">
-                    Loading demo data will first clear any existing transactional data (enquiries,
-                    orders, etc.) and replace it with sample records. Your account settings, company
-                    details, and user account will not be affected. Clearing data removes all
-                    transactional records but keeps your settings intact.
-                  </p>
-                </CardBody>
-              </Card>
-            </div>
-          )}
         </div>
       </div>
     </div>
