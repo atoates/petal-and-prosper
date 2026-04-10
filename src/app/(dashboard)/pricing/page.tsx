@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Can } from "@/components/auth/can";
 import { Card, CardBody, CardHeader, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 // Plus icon removed -- quote creation handled via Orders workflow
@@ -190,13 +191,16 @@ export default function PricingPage() {
         </CardBody>
 
         <CardFooter>
-          <Button
-            variant="primary"
-            onClick={handleSave}
-            disabled={saving}
-          >
-            {saving ? "Saving..." : "Save changes"}
-          </Button>
+          <Can permission="pricing:update">
+            <Button
+              variant="primary"
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? "Saving..." : "Save changes"}
+            </Button>
+          </Can>
         </CardFooter>
       </Card>
     </div>

@@ -6,6 +6,7 @@ import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Edit2, Trash2 } from "lucide-react";
 import { OrderModal } from "@/components/orders/order-modal";
+import { Can } from "@/components/auth/can";
 
 interface Order {
   id: string;
@@ -144,10 +145,12 @@ export default function OrdersPage() {
           <h1 className="text-xl sm:text-3xl font-serif font-bold text-gray-900">Orders</h1>
           <p className="text-gray-600 mt-1">Manage and track all orders</p>
         </div>
-        <Button variant="primary" onClick={() => handleOpenModal()}>
-          <Plus size={20} className="mr-2" />
-          New Order
-        </Button>
+        <Can permission="orders:create">
+          <Button variant="primary" type="button" onClick={() => handleOpenModal()}>
+            <Plus size={20} className="mr-2" />
+            New Order
+          </Button>
+        </Can>
       </div>
 
       {error && (
@@ -235,13 +238,16 @@ export default function OrdersPage() {
                         >
                           <Edit2 size={16} />
                         </button>
-                        <button
-                          onClick={() => handleDeleteOrder(order.id)}
-                          className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <Can permission="orders:delete">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOrder(order.id)}
+                            className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </Can>
                       </div>
                     </td>
                   </tr>

@@ -8,6 +8,7 @@ import { Plus, X } from "lucide-react";
 import { ColDef } from "ag-grid-community";
 import { DataGrid } from "@/components/ui/data-grid";
 import { CurrencyRenderer, CategoryBadgeRenderer } from "@/components/ui/grid-renderers";
+import { Can } from "@/components/auth/can";
 
 interface Product {
   id: string;
@@ -250,10 +251,12 @@ export default function LibrariesPage() {
           <h1 className="text-xl sm:text-3xl font-serif font-bold text-gray-900">Libraries</h1>
           <p className="text-gray-600 mt-1">Manage your product library</p>
         </div>
-        <Button variant="primary" onClick={() => setShowCreateModal(true)}>
-          <Plus size={20} className="mr-2" />
-          Add Product
-        </Button>
+        <Can permission="products:create">
+          <Button variant="primary" type="button" onClick={() => setShowCreateModal(true)}>
+            <Plus size={20} className="mr-2" />
+            Add Product
+          </Button>
+        </Can>
       </div>
 
       {error && (

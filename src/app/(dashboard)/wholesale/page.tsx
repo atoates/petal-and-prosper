@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus } from "lucide-react";
+import { Can } from "@/components/auth/can";
 
 interface WholesaleOrder {
   id: string;
@@ -83,10 +84,12 @@ export default function WholesalePage() {
           <h1 className="text-xl sm:text-3xl font-serif font-bold text-gray-900">Wholesale</h1>
           <p className="text-gray-600 mt-1">Manage supplier orders and stock</p>
         </div>
-        <Button variant="primary">
-          <Plus size={20} className="mr-2" />
-          New Wholesale Order
-        </Button>
+        <Can permission="wholesale:create">
+          <Button variant="primary" type="button">
+            <Plus size={20} className="mr-2" />
+            New Wholesale Order
+          </Button>
+        </Can>
       </div>
 
       {error && (

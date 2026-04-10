@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Edit2, Trash2 } from "lucide-react";
+import { Can } from "@/components/auth/can";
 import { EnquiryModal } from "@/components/enquiries/enquiry-modal";
 
 interface Enquiry {
@@ -162,10 +163,12 @@ export default function EnquiriesPage() {
           <h1 className="text-xl sm:text-3xl font-serif font-bold text-gray-900">Enquiries</h1>
           <p className="text-gray-600 mt-1">Manage and track client enquiries</p>
         </div>
-        <Button variant="primary" onClick={() => handleOpenModal()}>
-          <Plus size={20} className="mr-2" />
-          Add New
-        </Button>
+        <Can permission="enquiries:create">
+          <Button variant="primary" type="button" onClick={() => handleOpenModal()}>
+            <Plus size={20} className="mr-2" />
+            Add New
+          </Button>
+        </Can>
       </div>
 
       {error && (
@@ -291,13 +294,16 @@ export default function EnquiriesPage() {
                         >
                           <Edit2 size={16} />
                         </button>
-                        <button
-                          onClick={() => handleDeleteEnquiry(enquiry.id)}
-                          className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <Can permission="enquiries:delete">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteEnquiry(enquiry.id)}
+                            className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </Can>
                       </div>
                     </td>
                   </tr>

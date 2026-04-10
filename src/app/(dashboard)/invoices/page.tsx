@@ -8,6 +8,7 @@ import { Plus, Download } from "lucide-react";
 import { ColDef } from "ag-grid-community";
 import { DataGrid } from "@/components/ui/data-grid";
 import { StatusBadgeRenderer, CurrencyRenderer, DateRenderer } from "@/components/ui/grid-renderers";
+import { Can } from "@/components/auth/can";
 
 interface Invoice {
   id: string;
@@ -270,10 +271,12 @@ export default function InvoicesPage() {
           <h1 className="text-xl sm:text-3xl font-serif font-bold text-gray-900">Invoices</h1>
           <p className="text-gray-600 mt-1">Create and manage invoices</p>
         </div>
-        <Button variant="primary" onClick={handleOpenCreateModal}>
-          <Plus size={20} className="mr-2" />
-          New Invoice
-        </Button>
+        <Can permission="invoices:create">
+          <Button variant="primary" type="button" onClick={handleOpenCreateModal}>
+            <Plus size={20} className="mr-2" />
+            New Invoice
+          </Button>
+        </Can>
       </div>
 
       {error && (

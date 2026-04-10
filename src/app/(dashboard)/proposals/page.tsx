@@ -7,6 +7,7 @@ import { Plus, Download } from "lucide-react";
 import { ColDef } from "ag-grid-community";
 import { DataGrid } from "@/components/ui/data-grid";
 import { StatusBadgeRenderer, DateRenderer } from "@/components/ui/grid-renderers";
+import { Can } from "@/components/auth/can";
 
 interface Proposal {
   id: string;
@@ -228,10 +229,12 @@ export default function ProposalsPage() {
           <h1 className="text-xl sm:text-3xl font-serif font-bold text-gray-900">Proposals</h1>
           <p className="text-gray-600 mt-1">Create and send professional proposals</p>
         </div>
-        <Button variant="primary" onClick={handleOpenModal}>
-          <Plus size={20} className="mr-2" />
-          New Proposal
-        </Button>
+        <Can permission="proposals:create">
+          <Button variant="primary" type="button" onClick={handleOpenModal}>
+            <Plus size={20} className="mr-2" />
+            New Proposal
+          </Button>
+        </Can>
       </div>
 
       {error && (

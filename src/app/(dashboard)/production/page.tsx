@@ -6,6 +6,7 @@ import { Card, CardBody, CardHeader, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus } from "lucide-react";
+import { Can } from "@/components/auth/can";
 
 interface ProductionSchedule {
   id: string;
@@ -181,10 +182,12 @@ export default function ProductionPage() {
           <h1 className="text-xl sm:text-3xl font-serif font-bold text-gray-900">Production</h1>
           <p className="text-gray-600 mt-1">Schedule and manage production</p>
         </div>
-        <Button variant="primary" onClick={handleOpenModal}>
-          <Plus size={20} className="mr-2" />
-          New Schedule
-        </Button>
+        <Can permission="production:create">
+          <Button variant="primary" type="button" onClick={handleOpenModal}>
+            <Plus size={20} className="mr-2" />
+            New Schedule
+          </Button>
+        </Can>
       </div>
 
       {error && (

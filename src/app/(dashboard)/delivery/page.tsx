@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Plus } from "lucide-react";
+import { Can } from "@/components/auth/can";
 
 interface DeliverySchedule {
   id: string;
@@ -205,10 +206,12 @@ export default function DeliveryPage() {
           <h1 className="text-xl sm:text-3xl font-serif font-bold text-gray-900">Delivery</h1>
           <p className="text-gray-600 mt-1">Plan and manage deliveries</p>
         </div>
-        <Button variant="primary" onClick={handleOpenModal}>
-          <Plus size={20} className="mr-2" />
-          New Delivery
-        </Button>
+        <Can permission="delivery:create">
+          <Button variant="primary" type="button" onClick={handleOpenModal}>
+            <Plus size={20} className="mr-2" />
+            New Delivery
+          </Button>
+        </Can>
       </div>
 
       {error && (

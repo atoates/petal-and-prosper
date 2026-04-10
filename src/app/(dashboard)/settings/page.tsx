@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardHeader, CardBody, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Can } from "@/components/auth/can";
 
 type SettingsTab = "company" | "pricing" | "proposal" | "invoice" | "addresses";
 
@@ -222,13 +223,16 @@ export default function SettingsPage() {
                 />
               </CardBody>
               <CardFooter>
-                <Button
-                  variant="primary"
-                  onClick={handleSave}
-                  disabled={saving}
-                >
-                  {saving ? "Saving..." : "Save changes"}
-                </Button>
+                <Can permission="company:update">
+                  <Button
+                    variant="primary"
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saving}
+                  >
+                    {saving ? "Saving..." : "Save changes"}
+                  </Button>
+                </Can>
               </CardFooter>
             </Card>
           )}
@@ -311,13 +315,16 @@ export default function SettingsPage() {
                 />
               </CardBody>
               <CardFooter>
-                <Button
-                  variant="primary"
-                  onClick={handleSave}
-                  disabled={saving}
-                >
-                  {saving ? "Saving..." : "Save changes"}
-                </Button>
+                <Can permission="pricing:update">
+                  <Button
+                    variant="primary"
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saving}
+                  >
+                    {saving ? "Saving..." : "Save changes"}
+                  </Button>
+                </Can>
               </CardFooter>
             </Card>
           )}
@@ -380,13 +387,16 @@ export default function SettingsPage() {
                 </div>
               </CardBody>
               <CardFooter>
-                <Button
-                  variant="primary"
-                  onClick={handleSave}
-                  disabled={saving}
-                >
-                  {saving ? "Saving..." : "Save changes"}
-                </Button>
+                <Can permission="templates:update">
+                  <Button
+                    variant="primary"
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saving}
+                  >
+                    {saving ? "Saving..." : "Save changes"}
+                  </Button>
+                </Can>
               </CardFooter>
             </Card>
           )}
@@ -449,13 +459,16 @@ export default function SettingsPage() {
                 </div>
               </CardBody>
               <CardFooter>
-                <Button
-                  variant="primary"
-                  onClick={handleSave}
-                  disabled={saving}
-                >
-                  {saving ? "Saving..." : "Save changes"}
-                </Button>
+                <Can permission="templates:update">
+                  <Button
+                    variant="primary"
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saving}
+                  >
+                    {saving ? "Saving..." : "Save changes"}
+                  </Button>
+                </Can>
               </CardFooter>
             </Card>
           )}
