@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { productionSchedules } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
-import { getCompanyId } from "@/lib/api-helpers";
+import { productionSchedules, orders } from "@/lib/db/schema";
+import { eq, and, desc } from "drizzle-orm";
+import { requirePermissionApi } from "@/lib/auth/permissions-api";
 
 export async function GET(_request: NextRequest) {
+  const gate = await requirePermissionApi("production:read");
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
     const result = await db.query.productionSchedules.findMany({
-      where: eq(productionSchedules.companyId, COMPANY_ID),
+      where: eq(productionSchedules.companyId, ctx.companyId),
       with: {
         order: true,
       },
@@ -26,8 +29,11 @@ export async function GET(_request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const gate = await requirePermissionApi("production:create");
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
     const body = await request.json();
 
     const { orderId, eventDate, items, notes, status } = body;
@@ -39,11 +45,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const parentOrder = await db.query.orders.findFirst({
+      where: and(eq(orders.id, orderId), eq(orders.companyId, ctx.companyId)),
+      columns: { id: true },
+    });
+    if (!parentOrder) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
     const result = await db
       .insert(productionSchedules)
       .values({
         id: crypto.randomUUID(),
-        companyId: COMPANY_ID,
+        companyId: ctx.companyId,
         orderId,
         eventDate: eventDate ? new Date(eventDate) : null,
         items: items ? JSON.stringify(items) : null,

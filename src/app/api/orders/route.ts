@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { orders } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { getCompanyId } from "@/lib/api-helpers";
+import { requirePermissionApi } from "@/lib/auth/permissions-api";
 
 export async function GET(_request: NextRequest) {
+  const gate = await requirePermissionApi("orders:read");
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
     const result = await db.query.orders.findMany({
-      where: eq(orders.companyId, COMPANY_ID),
+      where: eq(orders.companyId, ctx.companyId),
       with: {
         enquiry: true,
       },
@@ -26,8 +29,11 @@ export async function GET(_request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const gate = await requirePermissionApi("orders:create");
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
     const body = await request.json();
 
     const { enquiryId, status, totalPrice } = body;
@@ -36,7 +42,7 @@ export async function POST(request: NextRequest) {
       .insert(orders)
       .values({
         id: crypto.randomUUID(),
-        companyId: COMPANY_ID,
+        companyId: ctx.companyId,
         enquiryId: enquiryId || null,
         status: status || "draft",
         totalPrice: totalPrice ? parseFloat(totalPrice).toString() : null,
