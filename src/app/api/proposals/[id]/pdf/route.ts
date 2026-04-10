@@ -1,21 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { proposals, companies, proposalSettings } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { generateProposalPdf } from "@/lib/pdf/proposal-pdf";
-import { getCompanyId } from "@/lib/api-helpers";
+import { requirePermissionApi } from "@/lib/auth/permissions-api";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const gate = await requirePermissionApi("proposals:read");
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
     const { id } = params;
 
-    // Fetch proposal with related data
+    // Scope the fetch to the caller's tenant -- previously this was keyed on
+    // id alone, letting any authenticated caller pull another tenant's PDF.
     const proposal = await db.query.proposals.findFirst({
-      where: eq(proposals.id, id),
+      where: and(eq(proposals.id, id), eq(proposals.companyId, ctx.companyId)),
       with: {
         order: {
           with: {
@@ -35,7 +39,7 @@ export async function GET(
 
     // Fetch company info
     const company = await db.query.companies.findFirst({
-      where: eq(companies.id, COMPANY_ID),
+      where: eq(companies.id, ctx.companyId),
     });
 
     if (!company) {
@@ -47,7 +51,7 @@ export async function GET(
 
     // Fetch proposal settings
     const settings = await db.query.proposalSettings.findFirst({
-      where: eq(proposalSettings.companyId, COMPANY_ID),
+      where: eq(proposalSettings.companyId, ctx.companyId),
     });
 
     // Calculate totals

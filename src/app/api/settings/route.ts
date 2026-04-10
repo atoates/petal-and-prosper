@@ -8,29 +8,35 @@ import {
   addresses,
 } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { getCompanyId } from "@/lib/api-helpers";
+import { requirePermissionApi, requireSessionApi } from "@/lib/auth/permissions-api";
+import { roleCan } from "@/lib/auth/permissions";
 
 export async function GET(_request: NextRequest) {
+  // Settings read covers company profile, pricing, templates. All roles can
+  // read all three, so requiring any one (company:read) is sufficient.
+  const gate = await requirePermissionApi("company:read");
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
     const companyData = await db.query.companies.findFirst({
-      where: eq(companies.id, COMPANY_ID),
+      where: eq(companies.id, ctx.companyId),
     });
 
     const priceSettingsData = await db.query.priceSettings.findFirst({
-      where: eq(priceSettings.companyId, COMPANY_ID),
+      where: eq(priceSettings.companyId, ctx.companyId),
     });
 
     const proposalSettingsData = await db.query.proposalSettings.findFirst({
-      where: eq(proposalSettings.companyId, COMPANY_ID),
+      where: eq(proposalSettings.companyId, ctx.companyId),
     });
 
     const invoiceSettingsData = await db.query.invoiceSettings.findFirst({
-      where: eq(invoiceSettings.companyId, COMPANY_ID),
+      where: eq(invoiceSettings.companyId, ctx.companyId),
     });
 
     const addressesData = await db.query.addresses.findMany({
-      where: eq(addresses.companyId, COMPANY_ID),
+      where: eq(addresses.companyId, ctx.companyId),
     });
 
     const result = {
@@ -52,8 +58,14 @@ export async function GET(_request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  // This endpoint can touch company profile (admin-only) AND pricing /
+  // templates (admin+manager), so the outer gate is "must be signed in"
+  // and each sub-section is checked individually.
+  const gate = await requireSessionApi();
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
     const body = await request.json();
 
     const {
@@ -62,6 +74,19 @@ export async function PUT(request: NextRequest) {
       proposalSettings: proposalSettingsData,
       invoiceSettings: invoiceSettingsData,
     } = body;
+
+    if (company && !roleCan(ctx.role, "company:update")) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
+    if (priceSettingsData && !roleCan(ctx.role, "pricing:update")) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
+    if (
+      (proposalSettingsData || invoiceSettingsData) &&
+      !roleCan(ctx.role, "templates:update")
+    ) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
 
     if (company) {
       await db
@@ -76,7 +101,7 @@ export async function PUT(request: NextRequest) {
           website: company.website,
           updatedAt: new Date(),
         })
-        .where(eq(companies.id, COMPANY_ID));
+        .where(eq(companies.id, ctx.companyId));
     }
 
     if (priceSettingsData) {
@@ -103,7 +128,7 @@ export async function PUT(request: NextRequest) {
             : undefined,
           updatedAt: new Date(),
         })
-        .where(eq(priceSettings.companyId, COMPANY_ID));
+        .where(eq(priceSettings.companyId, ctx.companyId));
     }
 
     if (proposalSettingsData) {
@@ -116,7 +141,7 @@ export async function PUT(request: NextRequest) {
             proposalSettingsData.termsAndConditions,
           updatedAt: new Date(),
         })
-        .where(eq(proposalSettings.companyId, COMPANY_ID));
+        .where(eq(proposalSettings.companyId, ctx.companyId));
     }
 
     if (invoiceSettingsData) {
@@ -128,28 +153,28 @@ export async function PUT(request: NextRequest) {
           notes: invoiceSettingsData.notes,
           updatedAt: new Date(),
         })
-        .where(eq(invoiceSettings.companyId, COMPANY_ID));
+        .where(eq(invoiceSettings.companyId, ctx.companyId));
     }
 
     const result = {
       company: company
         ? await db.query.companies.findFirst({
-            where: eq(companies.id, COMPANY_ID),
+            where: eq(companies.id, ctx.companyId),
           })
         : undefined,
       priceSettings: priceSettingsData
         ? await db.query.priceSettings.findFirst({
-            where: eq(priceSettings.companyId, COMPANY_ID),
+            where: eq(priceSettings.companyId, ctx.companyId),
           })
         : undefined,
       proposalSettings: proposalSettingsData
         ? await db.query.proposalSettings.findFirst({
-            where: eq(proposalSettings.companyId, COMPANY_ID),
+            where: eq(proposalSettings.companyId, ctx.companyId),
           })
         : undefined,
       invoiceSettings: invoiceSettingsData
         ? await db.query.invoiceSettings.findFirst({
-            where: eq(invoiceSettings.companyId, COMPANY_ID),
+            where: eq(invoiceSettings.companyId, ctx.companyId),
           })
         : undefined,
     };

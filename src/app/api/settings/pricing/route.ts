@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { priceSettings } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { getCompanyId } from "@/lib/api-helpers";
+import { requirePermissionApi } from "@/lib/auth/permissions-api";
 
 export async function GET(_request: NextRequest) {
+  const gate = await requirePermissionApi("pricing:read");
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
     const result = await db.query.priceSettings.findFirst({
-      where: eq(priceSettings.companyId, COMPANY_ID),
+      where: eq(priceSettings.companyId, ctx.companyId),
     });
 
     if (!result) {
@@ -29,8 +32,11 @@ export async function GET(_request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const gate = await requirePermissionApi("pricing:update");
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
     const body = await request.json();
 
     const {
@@ -68,7 +74,7 @@ export async function PUT(request: NextRequest) {
     const result = await db
       .update(priceSettings)
       .set(updateData)
-      .where(eq(priceSettings.companyId, COMPANY_ID))
+      .where(eq(priceSettings.companyId, ctx.companyId))
       .returning();
 
     if (result.length === 0) {

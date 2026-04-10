@@ -2,16 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { orders, orderItems } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getCompanyId } from "@/lib/api-helpers";
+import { requirePermissionApi } from "@/lib/auth/permissions-api";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const gate = await requirePermissionApi("orders:read");
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
     const result = await db.query.orders.findFirst({
-      where: and(eq(orders.id, params.id), eq(orders.companyId, COMPANY_ID)),
+      where: and(eq(orders.id, params.id), eq(orders.companyId, ctx.companyId)),
       with: {
         enquiry: true,
         items: true,
@@ -36,88 +39,92 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const gate = await requirePermissionApi("orders:update");
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
     const body = await request.json();
 
     const { enquiryId, status, version, totalPrice, items } = body;
 
-    // Update the order
-    const result = await db
-      .update(orders)
-      .set({
-        enquiryId: enquiryId || null,
-        status: status || "draft",
-        version: version || 1,
-        totalPrice: totalPrice ? parseFloat(totalPrice).toString() : null,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(orders.id, params.id), eq(orders.companyId, COMPANY_ID)))
-      .returning();
+    const updated = await db.transaction(async (tx) => {
+      // Update the order, scoped to tenant
+      const updateResult = await tx
+        .update(orders)
+        .set({
+          enquiryId: enquiryId || null,
+          status: status || "draft",
+          version: version || 1,
+          totalPrice: totalPrice ? parseFloat(totalPrice).toString() : null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(orders.id, params.id), eq(orders.companyId, ctx.companyId)))
+        .returning();
 
-    if (result.length === 0) {
-      return NextResponse.json({ error: "Order not found" }, { status: 404 });
-    }
-
-    // Update order items if provided
-    if (items && Array.isArray(items)) {
-      // Delete existing items that are not in the new list
-      const newItemIds = items
-        .filter((item: any) => item.id && !item.id.startsWith("new-"))
-        .map((item: any) => item.id);
-
-      const existingItems = await db
-        .select()
-        .from(orderItems)
-        .where(eq(orderItems.orderId, params.id));
-
-      const itemsToDelete = existingItems.filter(
-        (item) => !newItemIds.includes(item.id)
-      );
-
-      for (const item of itemsToDelete) {
-        await db.delete(orderItems).where(eq(orderItems.id, item.id));
+      if (updateResult.length === 0) {
+        return null;
       }
 
-      // Insert or update items
-      for (const item of items) {
-        if (item.id && !item.id.startsWith("new-")) {
-          // Update existing item
-          await db
-            .update(orderItems)
-            .set({
+      // Update order items if provided
+      if (items && Array.isArray(items)) {
+        const newItemIds = items
+          .filter((item: { id?: string }) => item.id && !item.id.startsWith("new-"))
+          .map((item: { id: string }) => item.id);
+
+        const existingItems = await tx
+          .select()
+          .from(orderItems)
+          .where(eq(orderItems.orderId, params.id));
+
+        const itemsToDelete = existingItems.filter(
+          (item) => !newItemIds.includes(item.id)
+        );
+
+        for (const item of itemsToDelete) {
+          await tx.delete(orderItems).where(eq(orderItems.id, item.id));
+        }
+
+        for (const item of items) {
+          if (item.id && !item.id.startsWith("new-")) {
+            await tx
+              .update(orderItems)
+              .set({
+                description: item.description,
+                category: item.category || null,
+                quantity: item.quantity,
+                unitPrice: parseFloat(item.unitPrice).toString(),
+                totalPrice: parseFloat(item.totalPrice).toString(),
+              })
+              .where(eq(orderItems.id, item.id));
+          } else {
+            await tx.insert(orderItems).values({
+              id: crypto.randomUUID(),
+              orderId: params.id,
               description: item.description,
               category: item.category || null,
               quantity: item.quantity,
               unitPrice: parseFloat(item.unitPrice).toString(),
               totalPrice: parseFloat(item.totalPrice).toString(),
-            })
-            .where(eq(orderItems.id, item.id));
-        } else {
-          // Insert new item
-          await db.insert(orderItems).values({
-            id: crypto.randomUUID(),
-            orderId: params.id,
-            description: item.description,
-            category: item.category || null,
-            quantity: item.quantity,
-            unitPrice: parseFloat(item.unitPrice).toString(),
-            totalPrice: parseFloat(item.totalPrice).toString(),
-          });
+            });
+          }
         }
       }
-    }
 
-    // Fetch the updated order with items
-    const updatedOrder = await db.query.orders.findFirst({
-      where: and(eq(orders.id, params.id), eq(orders.companyId, COMPANY_ID)),
-      with: {
-        enquiry: true,
-        items: true,
-      },
+      return tx.query.orders.findFirst({
+        where: and(eq(orders.id, params.id), eq(orders.companyId, ctx.companyId)),
+        with: {
+          enquiry: true,
+          items: true,
+        },
+      });
     });
 
-    return NextResponse.json(updatedOrder);
+    if (!updated) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(updated);
   } catch (error) {
     console.error("Error updating order:", error);
     return NextResponse.json(
@@ -131,20 +138,26 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const gate = await requirePermissionApi("orders:delete");
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
-    // Delete all order items
-    await db.delete(orderItems).where(eq(orderItems.orderId, params.id));
-
-    // Delete the order
-    const result = await db
-      .delete(orders)
-      .where(and(eq(orders.id, params.id), eq(orders.companyId, COMPANY_ID)))
-      .returning();
-
-    if (result.length === 0) {
+    // Verify order belongs to this tenant before touching items
+    const existing = await db.query.orders.findFirst({
+      where: and(eq(orders.id, params.id), eq(orders.companyId, ctx.companyId)),
+      columns: { id: true },
+    });
+    if (!existing) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
+
+    await db.transaction(async (tx) => {
+      await tx.delete(orderItems).where(eq(orderItems.orderId, params.id));
+      await tx
+        .delete(orders)
+        .where(and(eq(orders.id, params.id), eq(orders.companyId, ctx.companyId)));
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

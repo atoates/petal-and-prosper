@@ -2,30 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { products } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { getCompanyId } from "@/lib/api-helpers";
+import { requirePermissionApi } from "@/lib/auth/permissions-api";
 
 export async function GET(request: NextRequest) {
+  const gate = await requirePermissionApi("products:read");
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
     const { searchParams } = new URL(request.url);
     const category = searchParams.get("category");
 
-    let query = db.query.products.findMany({
-      where: eq(products.companyId, COMPANY_ID),
+    const result = await db.query.products.findMany({
+      where: eq(products.companyId, ctx.companyId),
       orderBy: desc(products.createdAt),
     });
 
     if (category) {
-      const result = await db.query.products.findMany({
-        where: eq(products.companyId, COMPANY_ID),
-        orderBy: desc(products.createdAt),
-      });
-      return NextResponse.json(
-        result.filter((p) => p.category === category)
-      );
+      return NextResponse.json(result.filter((p) => p.category === category));
     }
 
-    const result = await query;
     return NextResponse.json(result);
   } catch (error) {
     console.error("Error fetching products:", error);
@@ -37,8 +33,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const gate = await requirePermissionApi("products:create");
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
     const body = await request.json();
 
     const {
@@ -67,7 +66,7 @@ export async function POST(request: NextRequest) {
       .insert(products)
       .values({
         id: crypto.randomUUID(),
-        companyId: COMPANY_ID,
+        companyId: ctx.companyId,
         name,
         category,
         subcategory: subcategory || null,

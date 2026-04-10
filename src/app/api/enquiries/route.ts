@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { enquiries } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { getCompanyId } from "@/lib/api-helpers";
+import { requirePermissionApi } from "@/lib/auth/permissions-api";
 
 export async function GET(_request: NextRequest) {
+  const gate = await requirePermissionApi("enquiries:read");
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
     const result = await db.query.enquiries.findMany({
-      where: eq(enquiries.companyId, COMPANY_ID),
+      where: eq(enquiries.companyId, ctx.companyId),
       orderBy: desc(enquiries.createdAt),
     });
 
@@ -23,8 +26,11 @@ export async function GET(_request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const gate = await requirePermissionApi("enquiries:create");
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
     const body = await request.json();
 
     const {
@@ -50,7 +56,7 @@ export async function POST(request: NextRequest) {
       .insert(enquiries)
       .values({
         id: crypto.randomUUID(),
-        companyId: COMPANY_ID,
+        companyId: ctx.companyId,
         clientName,
         clientEmail,
         clientPhone: clientPhone || null,

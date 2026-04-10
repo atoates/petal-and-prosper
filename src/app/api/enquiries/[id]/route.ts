@@ -2,16 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { enquiries, orders } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getCompanyId } from "@/lib/api-helpers";
+import { requirePermissionApi } from "@/lib/auth/permissions-api";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const gate = await requirePermissionApi("enquiries:read");
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
     const result = await db.query.enquiries.findFirst({
-      where: and(eq(enquiries.id, params.id), eq(enquiries.companyId, COMPANY_ID)),
+      where: and(eq(enquiries.id, params.id), eq(enquiries.companyId, ctx.companyId)),
     });
 
     if (!result) {
@@ -32,8 +35,11 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const gate = await requirePermissionApi("enquiries:update");
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
     const body = await request.json();
 
     const {
@@ -70,7 +76,7 @@ export async function PUT(
         updatedAt: new Date(),
       })
       .where(
-        and(eq(enquiries.id, params.id), eq(enquiries.companyId, COMPANY_ID))
+        and(eq(enquiries.id, params.id), eq(enquiries.companyId, ctx.companyId))
       )
       .returning();
 
@@ -92,20 +98,23 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const gate = await requirePermissionApi("enquiries:delete");
+  if ("response" in gate) return gate.response;
+  const { ctx } = gate;
+
   try {
-    const COMPANY_ID = await getCompanyId();
     // First, delete all orders associated with this enquiry
     await db
       .delete(orders)
       .where(
-        and(eq(orders.enquiryId, params.id), eq(orders.companyId, COMPANY_ID))
+        and(eq(orders.enquiryId, params.id), eq(orders.companyId, ctx.companyId))
       );
 
     // Then delete the enquiry
     const result = await db
       .delete(enquiries)
       .where(
-        and(eq(enquiries.id, params.id), eq(enquiries.companyId, COMPANY_ID))
+        and(eq(enquiries.id, params.id), eq(enquiries.companyId, ctx.companyId))
       )
       .returning();
 
