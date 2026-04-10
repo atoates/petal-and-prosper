@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { productionSchedules, orders } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
+import { parseJsonBody, productionBodySchema } from "@/lib/validators/api";
 
 export async function GET(_request: NextRequest) {
   const gate = await requirePermissionApi("production:read");
@@ -20,7 +21,10 @@ export async function GET(_request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Error fetching production schedules:", error);
+    console.error(
+      "Error fetching production schedules:",
+      error instanceof Error ? error.message : "unknown"
+    );
     return NextResponse.json(
       { error: "Failed to fetch production schedules" },
       { status: 500 }
@@ -33,20 +37,16 @@ export async function POST(request: NextRequest) {
   if ("response" in gate) return gate.response;
   const { ctx } = gate;
 
+  const parsed = await parseJsonBody(request, productionBodySchema);
+  if (!parsed.success) return parsed.response;
+  const data = parsed.data;
+
   try {
-    const body = await request.json();
-
-    const { orderId, eventDate, items, notes, status } = body;
-
-    if (!orderId) {
-      return NextResponse.json(
-        { error: "Order ID is required" },
-        { status: 400 }
-      );
-    }
-
     const parentOrder = await db.query.orders.findFirst({
-      where: and(eq(orders.id, orderId), eq(orders.companyId, ctx.companyId)),
+      where: and(
+        eq(orders.id, data.orderId),
+        eq(orders.companyId, ctx.companyId)
+      ),
       columns: { id: true },
     });
     if (!parentOrder) {
@@ -58,17 +58,23 @@ export async function POST(request: NextRequest) {
       .values({
         id: crypto.randomUUID(),
         companyId: ctx.companyId,
-        orderId,
-        eventDate: eventDate ? new Date(eventDate) : null,
-        items: items ? JSON.stringify(items) : null,
-        notes: notes || null,
-        status: status || "not_started",
+        orderId: data.orderId,
+        eventDate: data.eventDate,
+        items:
+          data.items === undefined || data.items === null
+            ? null
+            : JSON.stringify(data.items),
+        notes: data.notes,
+        status: data.status,
       })
       .returning();
 
     return NextResponse.json(result[0], { status: 201 });
   } catch (error) {
-    console.error("Error creating production schedule:", error);
+    console.error(
+      "Error creating production schedule:",
+      error instanceof Error ? error.message : "unknown"
+    );
     return NextResponse.json(
       { error: "Failed to create production schedule" },
       { status: 500 }

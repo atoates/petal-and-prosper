@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { orders, orderItems } from "@/lib/db/schema";
+import { orders, orderItems, enquiries } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
+import { parseJsonBody, orderUpdateSchema } from "@/lib/validators/api";
 
 export async function GET(
   _request: NextRequest,
@@ -27,7 +28,10 @@ export async function GET(
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Error fetching order:", error);
+    console.error(
+      "Error fetching order:",
+      error instanceof Error ? error.message : "unknown"
+    );
     return NextResponse.json(
       { error: "Failed to fetch order" },
       { status: 500 }
@@ -43,23 +47,42 @@ export async function PUT(
   if ("response" in gate) return gate.response;
   const { ctx } = gate;
 
-  try {
-    const body = await request.json();
+  const parsed = await parseJsonBody(request, orderUpdateSchema);
+  if (!parsed.success) return parsed.response;
+  const data = parsed.data;
 
-    const { enquiryId, status, version, totalPrice, items } = body;
+  try {
+    // If swapping the linked enquiry, re-verify tenant ownership.
+    if (data.enquiryId) {
+      const parent = await db.query.enquiries.findFirst({
+        where: and(
+          eq(enquiries.id, data.enquiryId),
+          eq(enquiries.companyId, ctx.companyId)
+        ),
+        columns: { id: true },
+      });
+      if (!parent) {
+        return NextResponse.json(
+          { error: "Enquiry not found" },
+          { status: 404 }
+        );
+      }
+    }
 
     const updated = await db.transaction(async (tx) => {
       // Update the order, scoped to tenant
       const updateResult = await tx
         .update(orders)
         .set({
-          enquiryId: enquiryId || null,
-          status: status || "draft",
-          version: version || 1,
-          totalPrice: totalPrice ? parseFloat(totalPrice).toString() : null,
+          enquiryId: data.enquiryId,
+          status: data.status,
+          version: data.version ?? 1,
+          totalPrice: data.totalPrice,
           updatedAt: new Date(),
         })
-        .where(and(eq(orders.id, params.id), eq(orders.companyId, ctx.companyId)))
+        .where(
+          and(eq(orders.id, params.id), eq(orders.companyId, ctx.companyId))
+        )
         .returning();
 
       if (updateResult.length === 0) {
@@ -67,10 +90,14 @@ export async function PUT(
       }
 
       // Update order items if provided
-      if (items && Array.isArray(items)) {
-        const newItemIds = items
-          .filter((item: { id?: string }) => item.id && !item.id.startsWith("new-"))
-          .map((item: { id: string }) => item.id);
+      if (data.items && Array.isArray(data.items)) {
+        const incoming = data.items;
+        const newItemIds = incoming
+          .filter(
+            (item): item is typeof item & { id: string } =>
+              !!item.id && !item.id.startsWith("new-")
+          )
+          .map((item) => item.id);
 
         const existingItems = await tx
           .select()
@@ -85,16 +112,16 @@ export async function PUT(
           await tx.delete(orderItems).where(eq(orderItems.id, item.id));
         }
 
-        for (const item of items) {
+        for (const item of incoming) {
           if (item.id && !item.id.startsWith("new-")) {
             await tx
               .update(orderItems)
               .set({
                 description: item.description,
-                category: item.category || null,
+                category: item.category,
                 quantity: item.quantity,
-                unitPrice: parseFloat(item.unitPrice).toString(),
-                totalPrice: parseFloat(item.totalPrice).toString(),
+                unitPrice: item.unitPrice,
+                totalPrice: item.totalPrice,
               })
               .where(eq(orderItems.id, item.id));
           } else {
@@ -102,17 +129,20 @@ export async function PUT(
               id: crypto.randomUUID(),
               orderId: params.id,
               description: item.description,
-              category: item.category || null,
+              category: item.category,
               quantity: item.quantity,
-              unitPrice: parseFloat(item.unitPrice).toString(),
-              totalPrice: parseFloat(item.totalPrice).toString(),
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
             });
           }
         }
       }
 
       return tx.query.orders.findFirst({
-        where: and(eq(orders.id, params.id), eq(orders.companyId, ctx.companyId)),
+        where: and(
+          eq(orders.id, params.id),
+          eq(orders.companyId, ctx.companyId)
+        ),
         with: {
           enquiry: true,
           items: true,
@@ -126,7 +156,10 @@ export async function PUT(
 
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("Error updating order:", error);
+    console.error(
+      "Error updating order:",
+      error instanceof Error ? error.message : "unknown"
+    );
     return NextResponse.json(
       { error: "Failed to update order" },
       { status: 500 }
@@ -156,12 +189,17 @@ export async function DELETE(
       await tx.delete(orderItems).where(eq(orderItems.orderId, params.id));
       await tx
         .delete(orders)
-        .where(and(eq(orders.id, params.id), eq(orders.companyId, ctx.companyId)));
+        .where(
+          and(eq(orders.id, params.id), eq(orders.companyId, ctx.companyId))
+        );
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting order:", error);
+    console.error(
+      "Error deleting order:",
+      error instanceof Error ? error.message : "unknown"
+    );
     return NextResponse.json(
       { error: "Failed to delete order" },
       { status: 500 }

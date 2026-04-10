@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { products } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
+import { parseJsonBody, productBodySchema } from "@/lib/validators/api";
 
 export async function GET(request: NextRequest) {
   const gate = await requirePermissionApi("products:read");
@@ -24,7 +25,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Error fetching products:", error);
+    console.error(
+      "Error fetching products:",
+      error instanceof Error ? error.message : "unknown"
+    );
     return NextResponse.json(
       { error: "Failed to fetch products" },
       { status: 500 }
@@ -37,54 +41,41 @@ export async function POST(request: NextRequest) {
   if ("response" in gate) return gate.response;
   const { ctx } = gate;
 
+  const parsed = await parseJsonBody(request, productBodySchema);
+  if (!parsed.success) return parsed.response;
+  const data = parsed.data;
+
   try {
-    const body = await request.json();
-
-    const {
-      name,
-      category,
-      subcategory,
-      wholesalePrice,
-      retailPrice,
-      unit,
-      stemCount,
-      colour,
-      season,
-      supplier,
-      notes,
-      isActive,
-    } = body;
-
-    if (!name || !category) {
-      return NextResponse.json(
-        { error: "Name and category are required" },
-        { status: 400 }
-      );
-    }
-
     const result = await db
       .insert(products)
       .values({
         id: crypto.randomUUID(),
         companyId: ctx.companyId,
-        name,
-        category,
-        subcategory: subcategory || null,
-        wholesalePrice: wholesalePrice ? parseFloat(wholesalePrice).toString() : null,
-        retailPrice: retailPrice ? parseFloat(retailPrice).toString() : null,
-        unit: unit || "stem",
-        stemCount: stemCount ? parseInt(stemCount) : null,
-        colour: colour || null,
-        season: season || null,
-        supplier: supplier || null,
-        notes: notes || null,
-        isActive: isActive !== undefined ? (isActive ? "true" : "false") : "true",
+        name: data.name,
+        category: data.category,
+        subcategory: data.subcategory,
+        wholesalePrice: data.wholesalePrice,
+        retailPrice: data.retailPrice,
+        unit: data.unit ?? "stem",
+        stemCount: data.stemCount ?? null,
+        colour: data.colour,
+        season: data.season,
+        supplier: data.supplier,
+        notes: data.notes,
+        // isActive is persisted as a 5-char varchar ("true"/"false") --
+        // see the code review note, this should eventually become a
+        // real boolean column.
+        isActive:
+          data.isActive === undefined ? "true" : data.isActive ? "true" : "false",
       })
       .returning();
 
     return NextResponse.json(result[0], { status: 201 });
   } catch (error) {
-    console.error("Error creating product:", error);
+    console.error(
+      "Error creating product:",
+      error instanceof Error ? error.message : "unknown"
+    );
     return NextResponse.json(
       { error: "Failed to create product" },
       { status: 500 }

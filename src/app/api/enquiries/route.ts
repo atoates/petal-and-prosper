@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { enquiries } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
+import { parseJsonBody, enquiryBodySchema } from "@/lib/validators/api";
 
 export async function GET(_request: NextRequest) {
   const gate = await requirePermissionApi("enquiries:read");
@@ -17,7 +18,10 @@ export async function GET(_request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Error fetching enquiries:", error);
+    console.error(
+      "Error fetching enquiries:",
+      error instanceof Error ? error.message : "unknown"
+    );
     return NextResponse.json(
       { error: "Failed to fetch enquiries" },
       { status: 500 }
@@ -30,48 +34,34 @@ export async function POST(request: NextRequest) {
   if ("response" in gate) return gate.response;
   const { ctx } = gate;
 
+  const parsed = await parseJsonBody(request, enquiryBodySchema);
+  if (!parsed.success) return parsed.response;
+  const data = parsed.data;
+
   try {
-    const body = await request.json();
-
-    const {
-      clientName,
-      clientEmail,
-      clientPhone,
-      eventType,
-      eventDate,
-      venueA,
-      venueB,
-      progress,
-      notes,
-    } = body;
-
-    if (!clientName || !clientEmail) {
-      return NextResponse.json(
-        { error: "Client name and email are required" },
-        { status: 400 }
-      );
-    }
-
     const result = await db
       .insert(enquiries)
       .values({
         id: crypto.randomUUID(),
         companyId: ctx.companyId,
-        clientName,
-        clientEmail,
-        clientPhone: clientPhone || null,
-        eventType: eventType || null,
-        eventDate: eventDate ? new Date(eventDate) : null,
-        venueA: venueA || null,
-        venueB: venueB || null,
-        progress: progress || "New",
-        notes: notes || null,
+        clientName: data.clientName,
+        clientEmail: data.clientEmail,
+        clientPhone: data.clientPhone,
+        eventType: data.eventType,
+        eventDate: data.eventDate,
+        venueA: data.venueA,
+        venueB: data.venueB,
+        progress: data.progress,
+        notes: data.notes,
       })
       .returning();
 
     return NextResponse.json(result[0], { status: 201 });
   } catch (error) {
-    console.error("Error creating enquiry:", error);
+    console.error(
+      "Error creating enquiry:",
+      error instanceof Error ? error.message : "unknown"
+    );
     return NextResponse.json(
       { error: "Failed to create enquiry" },
       { status: 500 }

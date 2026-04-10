@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { wholesaleOrders, orders } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
+import { parseJsonBody, wholesaleBodySchema } from "@/lib/validators/api";
 
 export async function GET(_request: NextRequest) {
   const gate = await requirePermissionApi("wholesale:read");
@@ -20,7 +21,10 @@ export async function GET(_request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Error fetching wholesale orders:", error);
+    console.error(
+      "Error fetching wholesale orders:",
+      error instanceof Error ? error.message : "unknown"
+    );
     return NextResponse.json(
       { error: "Failed to fetch wholesale orders" },
       { status: 500 }
@@ -33,21 +37,16 @@ export async function POST(request: NextRequest) {
   if ("response" in gate) return gate.response;
   const { ctx } = gate;
 
+  const parsed = await parseJsonBody(request, wholesaleBodySchema);
+  if (!parsed.success) return parsed.response;
+  const data = parsed.data;
+
   try {
-    const body = await request.json();
-
-    const { orderId, supplier, items, status, orderDate, receivedDate } =
-      body;
-
-    if (!orderId || !supplier) {
-      return NextResponse.json(
-        { error: "Order ID and supplier are required" },
-        { status: 400 }
-      );
-    }
-
     const parentOrder = await db.query.orders.findFirst({
-      where: and(eq(orders.id, orderId), eq(orders.companyId, ctx.companyId)),
+      where: and(
+        eq(orders.id, data.orderId),
+        eq(orders.companyId, ctx.companyId)
+      ),
       columns: { id: true },
     });
     if (!parentOrder) {
@@ -59,18 +58,24 @@ export async function POST(request: NextRequest) {
       .values({
         id: crypto.randomUUID(),
         companyId: ctx.companyId,
-        orderId,
-        supplier,
-        items: items ? JSON.stringify(items) : null,
-        status: status || "pending",
-        orderDate: orderDate ? new Date(orderDate) : new Date(),
-        receivedDate: receivedDate ? new Date(receivedDate) : null,
+        orderId: data.orderId,
+        supplier: data.supplier,
+        items:
+          data.items === undefined || data.items === null
+            ? null
+            : JSON.stringify(data.items),
+        status: data.status,
+        orderDate: data.orderDate ?? new Date(),
+        receivedDate: data.receivedDate,
       })
       .returning();
 
     return NextResponse.json(result[0], { status: 201 });
   } catch (error) {
-    console.error("Error creating wholesale order:", error);
+    console.error(
+      "Error creating wholesale order:",
+      error instanceof Error ? error.message : "unknown"
+    );
     return NextResponse.json(
       { error: "Failed to create wholesale order" },
       { status: 500 }

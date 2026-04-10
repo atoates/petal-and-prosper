@@ -8,8 +8,15 @@ import {
   addresses,
 } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { requirePermissionApi, requireSessionApi } from "@/lib/auth/permissions-api";
+import {
+  requirePermissionApi,
+  requireSessionApi,
+} from "@/lib/auth/permissions-api";
 import { roleCan } from "@/lib/auth/permissions";
+import {
+  parseJsonBody,
+  settingsBulkUpdateSchema,
+} from "@/lib/validators/api";
 
 export async function GET(_request: NextRequest) {
   // Settings read covers company profile, pricing, templates. All roles can
@@ -49,7 +56,10 @@ export async function GET(_request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Error fetching settings:", error);
+    console.error(
+      "Error fetching settings:",
+      error instanceof Error ? error.message : "unknown"
+    );
     return NextResponse.json(
       { error: "Failed to fetch settings" },
       { status: 500 }
@@ -65,40 +75,49 @@ export async function PUT(request: NextRequest) {
   if ("response" in gate) return gate.response;
   const { ctx } = gate;
 
+  const parsed = await parseJsonBody(request, settingsBulkUpdateSchema);
+  if (!parsed.success) return parsed.response;
+  const {
+    company,
+    priceSettings: priceSettingsData,
+    proposalSettings: proposalSettingsData,
+    invoiceSettings: invoiceSettingsData,
+  } = parsed.data;
+
   try {
-    const body = await request.json();
-
-    const {
-      company,
-      priceSettings: priceSettingsData,
-      proposalSettings: proposalSettingsData,
-      invoiceSettings: invoiceSettingsData,
-    } = body;
-
     if (company && !roleCan(ctx.role, "company:update")) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 }
+      );
     }
     if (priceSettingsData && !roleCan(ctx.role, "pricing:update")) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 }
+      );
     }
     if (
       (proposalSettingsData || invoiceSettingsData) &&
       !roleCan(ctx.role, "templates:update")
     ) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 }
+      );
     }
 
     if (company) {
       await db
         .update(companies)
         .set({
-          name: company.name,
-          registrationNo: company.registrationNo,
-          contactNo: company.contactNo,
-          email: company.email,
-          currency: company.currency,
-          logoUrl: company.logoUrl,
-          website: company.website,
+          name: company.name ?? undefined,
+          registrationNo: company.registrationNo ?? undefined,
+          contactNo: company.contactNo ?? undefined,
+          email: company.email ?? undefined,
+          currency: company.currency ?? undefined,
+          logoUrl: company.logoUrl ?? undefined,
+          website: company.website ?? undefined,
           updatedAt: new Date(),
         })
         .where(eq(companies.id, ctx.companyId));
@@ -108,24 +127,15 @@ export async function PUT(request: NextRequest) {
       await db
         .update(priceSettings)
         .set({
-          multiple: priceSettingsData.multiple
-            ? parseFloat(priceSettingsData.multiple).toString()
-            : undefined,
-          flowerBuffer: priceSettingsData.flowerBuffer
-            ? parseFloat(priceSettingsData.flowerBuffer).toString()
-            : undefined,
-          fuelCostPerLitre: priceSettingsData.fuelCostPerLitre
-            ? parseFloat(priceSettingsData.fuelCostPerLitre).toString()
-            : undefined,
-          milesPerGallon: priceSettingsData.milesPerGallon
-            ? parseInt(priceSettingsData.milesPerGallon)
-            : undefined,
-          staffCostPerHour: priceSettingsData.staffCostPerHour
-            ? parseFloat(priceSettingsData.staffCostPerHour).toString()
-            : undefined,
-          staffMargin: priceSettingsData.staffMargin
-            ? parseFloat(priceSettingsData.staffMargin).toString()
-            : undefined,
+          multiple: priceSettingsData.multiple ?? undefined,
+          flowerBuffer: priceSettingsData.flowerBuffer ?? undefined,
+          fuelCostPerLitre:
+            priceSettingsData.fuelCostPerLitre ?? undefined,
+          milesPerGallon:
+            priceSettingsData.milesPerGallon ?? undefined,
+          staffCostPerHour:
+            priceSettingsData.staffCostPerHour ?? undefined,
+          staffMargin: priceSettingsData.staffMargin ?? undefined,
           updatedAt: new Date(),
         })
         .where(eq(priceSettings.companyId, ctx.companyId));
@@ -135,10 +145,10 @@ export async function PUT(request: NextRequest) {
       await db
         .update(proposalSettings)
         .set({
-          headerText: proposalSettingsData.headerText,
-          footerText: proposalSettingsData.footerText,
+          headerText: proposalSettingsData.headerText ?? undefined,
+          footerText: proposalSettingsData.footerText ?? undefined,
           termsAndConditions:
-            proposalSettingsData.termsAndConditions,
+            proposalSettingsData.termsAndConditions ?? undefined,
           updatedAt: new Date(),
         })
         .where(eq(proposalSettings.companyId, ctx.companyId));
@@ -148,9 +158,9 @@ export async function PUT(request: NextRequest) {
       await db
         .update(invoiceSettings)
         .set({
-          paymentTerms: invoiceSettingsData.paymentTerms,
-          bankDetails: invoiceSettingsData.bankDetails,
-          notes: invoiceSettingsData.notes,
+          paymentTerms: invoiceSettingsData.paymentTerms ?? undefined,
+          bankDetails: invoiceSettingsData.bankDetails ?? undefined,
+          notes: invoiceSettingsData.notes ?? undefined,
           updatedAt: new Date(),
         })
         .where(eq(invoiceSettings.companyId, ctx.companyId));
@@ -181,7 +191,10 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Error updating settings:", error);
+    console.error(
+      "Error updating settings:",
+      error instanceof Error ? error.message : "unknown"
+    );
     return NextResponse.json(
       { error: "Failed to update settings" },
       { status: 500 }

@@ -3,6 +3,10 @@ import { db } from "@/lib/db";
 import { priceSettings } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
+import {
+  parseJsonBody,
+  priceSettingsUpdateSchema,
+} from "@/lib/validators/api";
 
 export async function GET(_request: NextRequest) {
   const gate = await requirePermissionApi("pricing:read");
@@ -23,7 +27,10 @@ export async function GET(_request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Error fetching price settings:", error);
+    console.error(
+      "Error fetching price settings:",
+      error instanceof Error ? error.message : "unknown"
+    );
     return NextResponse.json(
       { error: "Failed to fetch price settings" },
       { status: 500 }
@@ -36,40 +43,40 @@ export async function PUT(request: NextRequest) {
   if ("response" in gate) return gate.response;
   const { ctx } = gate;
 
+  const parsed = await parseJsonBody(request, priceSettingsUpdateSchema);
+  if (!parsed.success) return parsed.response;
+  const data = parsed.data;
+
   try {
-    const body = await request.json();
-
-    const {
-      multiple,
-      flowerBuffer,
-      fuelCostPerLitre,
-      milesPerGallon,
-      staffCostPerHour,
-      staffMargin,
-    } = body;
-
-    const updateData: Record<string, unknown> = {};
-
-    if (multiple !== undefined) {
-      updateData.multiple = parseFloat(multiple).toString();
+    // Only include fields the caller actually sent. Using undefined for
+    // a field tells Drizzle to skip it in the UPDATE.
+    const updateData: Record<string, unknown> = {
+      updatedAt: new Date(),
+    };
+    if (data.multiple !== undefined && data.multiple !== null) {
+      updateData.multiple = data.multiple;
     }
-    if (flowerBuffer !== undefined) {
-      updateData.flowerBuffer = parseFloat(flowerBuffer).toString();
+    if (data.flowerBuffer !== undefined && data.flowerBuffer !== null) {
+      updateData.flowerBuffer = data.flowerBuffer;
     }
-    if (fuelCostPerLitre !== undefined) {
-      updateData.fuelCostPerLitre = parseFloat(fuelCostPerLitre).toString();
+    if (
+      data.fuelCostPerLitre !== undefined &&
+      data.fuelCostPerLitre !== null
+    ) {
+      updateData.fuelCostPerLitre = data.fuelCostPerLitre;
     }
-    if (milesPerGallon !== undefined) {
-      updateData.milesPerGallon = parseInt(milesPerGallon);
+    if (data.milesPerGallon !== undefined && data.milesPerGallon !== null) {
+      updateData.milesPerGallon = data.milesPerGallon;
     }
-    if (staffCostPerHour !== undefined) {
-      updateData.staffCostPerHour = parseFloat(staffCostPerHour).toString();
+    if (
+      data.staffCostPerHour !== undefined &&
+      data.staffCostPerHour !== null
+    ) {
+      updateData.staffCostPerHour = data.staffCostPerHour;
     }
-    if (staffMargin !== undefined) {
-      updateData.staffMargin = parseFloat(staffMargin).toString();
+    if (data.staffMargin !== undefined && data.staffMargin !== null) {
+      updateData.staffMargin = data.staffMargin;
     }
-
-    updateData.updatedAt = new Date();
 
     const result = await db
       .update(priceSettings)
@@ -86,7 +93,10 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json(result[0]);
   } catch (error) {
-    console.error("Error updating price settings:", error);
+    console.error(
+      "Error updating price settings:",
+      error instanceof Error ? error.message : "unknown"
+    );
     return NextResponse.json(
       { error: "Failed to update price settings" },
       { status: 500 }
