@@ -39,3 +39,4 @@ drizzle/*.sql
 .idea/
 *.swp
 *.swo
+tsconfig.tsbuildinfo
