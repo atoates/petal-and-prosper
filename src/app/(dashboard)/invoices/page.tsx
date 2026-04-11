@@ -36,6 +36,9 @@ interface Order {
 
 interface CreateInvoiceFormData {
   orderId: string;
+  // `invoiceNumber` and `totalAmount` are optional overrides --
+  // the API will auto-generate both if left blank (INV-{year}-{0001}
+  // per-company sequence, total pulled from the order's line items).
   invoiceNumber: string;
   totalAmount: string;
   dueDate: string;
@@ -134,26 +137,34 @@ export default function InvoicesPage() {
   const handleSubmitCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.orderId || !formData.invoiceNumber || !formData.totalAmount || !formData.dueDate) {
-      setSubmitError("All fields are required");
+    if (!formData.orderId || !formData.dueDate) {
+      setSubmitError("Order and due date are required");
       return;
     }
 
     try {
       setSubmitting(true);
       setSubmitError(null);
+      // Only pass invoiceNumber / totalAmount when the user has supplied an
+      // override -- otherwise let the API generate them from the order.
+      const payload: Record<string, unknown> = {
+        orderId: formData.orderId,
+        dueDate: formData.dueDate,
+        status: formData.status,
+      };
+      if (formData.invoiceNumber.trim()) {
+        payload.invoiceNumber = formData.invoiceNumber.trim();
+      }
+      if (formData.totalAmount.trim()) {
+        payload.totalAmount = parseFloat(formData.totalAmount);
+      }
+
       const response = await fetch("/api/invoices", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          orderId: formData.orderId,
-          invoiceNumber: formData.invoiceNumber,
-          totalAmount: parseFloat(formData.totalAmount),
-          dueDate: formData.dueDate,
-          status: formData.status,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -342,32 +353,36 @@ export default function InvoicesPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Invoice Number
+                    Invoice Number <span className="text-gray-400 font-normal">(optional)</span>
                   </label>
                   <Input
                     type="text"
                     name="invoiceNumber"
                     value={formData.invoiceNumber}
                     onChange={handleFormChange}
-                    placeholder="e.g., INV-001"
-                    required
+                    placeholder="Auto: INV-YYYY-0001"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Leave blank to auto-generate the next number for your company.
+                  </p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Total Amount
+                    Total Amount <span className="text-gray-400 font-normal">(optional)</span>
                   </label>
                   <Input
                     type="number"
                     name="totalAmount"
                     value={formData.totalAmount}
                     onChange={handleFormChange}
-                    placeholder="0.00"
+                    placeholder="Auto from order"
                     step="0.01"
                     min="0"
-                    required
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Leave blank to pull the total from the order&apos;s line items.
+                  </p>
                 </div>
 
                 <div>

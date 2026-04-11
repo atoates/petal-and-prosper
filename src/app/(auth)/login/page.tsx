@@ -31,7 +31,7 @@ export default function LoginPage() {
           csrfToken,
           email,
           password,
-          callbackUrl: "/enquiries",
+          callbackUrl: "/home",
         }),
         redirect: "follow",
       });
@@ -44,7 +44,7 @@ export default function LoginPage() {
           setIsLoading(false);
         } else {
           // Success - redirect to the dashboard
-          router.push("/enquiries");
+          router.push("/home");
           router.refresh();
         }
       } else {

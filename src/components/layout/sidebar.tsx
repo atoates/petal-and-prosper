@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Flower, LogOut, Menu, X } from "lucide-react";
 import {
+  Home,
   FileText,
   ShoppingCart,
   DollarSign,
@@ -21,6 +22,7 @@ import {
 import { useState, useEffect } from "react";
 
 const navigationItems = [
+  { name: "Home", href: "/home", icon: Home },
   { name: "Enquiries", href: "/enquiries", icon: FileText },
   { name: "Orders", href: "/orders", icon: ShoppingCart },
   { name: "Pricing", href: "/pricing", icon: DollarSign },

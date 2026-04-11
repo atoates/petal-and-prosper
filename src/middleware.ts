@@ -6,6 +6,7 @@ export default auth;
 
 export const config = {
   matcher: [
+    "/home/:path*",
     "/enquiries/:path*",
     "/orders/:path*",
     "/pricing/:path*",

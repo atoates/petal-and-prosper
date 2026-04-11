@@ -63,6 +63,8 @@ export async function POST(request: NextRequest) {
         status: data.status,
         sentAt: data.sentAt,
         content: data.content ?? null,
+        subject: data.subject ?? null,
+        bodyHtml: data.bodyHtml ?? null,
       })
       .returning();
 

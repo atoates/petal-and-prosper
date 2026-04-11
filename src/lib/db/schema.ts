@@ -149,6 +149,12 @@ export const orders = pgTable(
     version: integer("version").default(1),
     status: orderStatusEnum("status").default("draft"),
     totalPrice: decimal("total_price", { precision: 10, scale: 2 }),
+    // JSON snapshot of the PricingRules that produced the current line
+    // item totals, plus any delivery/labour inputs the user supplied.
+    // This lets us re-render a historical quote even if price_settings
+    // has changed since. Nullable because older rows were created before
+    // the pricing engine was wired in.
+    pricingSnapshot: text("pricing_snapshot"),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
   }
@@ -176,6 +182,20 @@ export const proposals = pgTable(
     companyId: text("company_id").notNull(),
     status: proposalStatusEnum("status").default("draft"),
     sentAt: timestamp("sent_at"),
+    // Email subject line when this proposal is sent. Optional because
+    // older draft proposals were created before the send flow existed.
+    subject: text("subject"),
+    // Rendered HTML body of the email (or the page the client sees
+    // when they follow the public accept/decline link).
+    bodyHtml: text("body_html"),
+    // Opaque random token that becomes part of the public
+    // accept/decline URL. We don't put the proposal id in the URL so
+    // a leaked id can't be used to guess at another tenant's data.
+    publicToken: text("public_token"),
+    // Timestamps recorded when the client clicks accept/decline from
+    // the public page.
+    acceptedAt: timestamp("accepted_at"),
+    rejectedAt: timestamp("rejected_at"),
     content: text("content"),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),

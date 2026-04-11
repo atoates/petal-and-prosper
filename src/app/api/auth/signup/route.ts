@@ -1,6 +1,12 @@
 import { hash } from "bcryptjs";
 import { db } from "@/lib/db";
-import { users, companies } from "@/lib/db/schema";
+import {
+  users,
+  companies,
+  priceSettings,
+  proposalSettings,
+  invoiceSettings,
+} from "@/lib/db/schema";
 import { sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
@@ -76,6 +82,23 @@ export async function POST(request: NextRequest) {
         name: companyName,
       })
       .returning();
+
+    // Seed the per-company settings rows so the wizard's PUT calls
+    // and the settings page have something to UPDATE. Without these,
+    // the first-run user would get 404s trying to configure pricing,
+    // proposals or invoices. Defaults mirror the schema defaults.
+    await db.insert(priceSettings).values({
+      id: randomUUID(),
+      companyId: company.id,
+    });
+    await db.insert(proposalSettings).values({
+      id: randomUUID(),
+      companyId: company.id,
+    });
+    await db.insert(invoiceSettings).values({
+      id: randomUUID(),
+      companyId: company.id,
+    });
 
     const [user] = await db
       .insert(users)

@@ -69,7 +69,7 @@ export default function SignupPage() {
       if (signInResult?.error) {
         setError("Account created but sign in failed. Please try logging in.");
       } else {
-        router.push("/enquiries");
+        router.push("/home");
         router.refresh();
       }
     } catch (err) {

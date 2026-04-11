@@ -149,9 +149,12 @@ export const invoiceStatus = z.enum(["draft", "sent", "paid", "overdue"]);
 
 export const invoiceBodySchema = z.object({
   orderId: requiredTrimmed("Order ID", 100),
-  invoiceNumber: requiredTrimmed("Invoice number", 100),
+  // Both `invoiceNumber` and `totalAmount` are optional at the API boundary:
+  // when omitted, the route handler auto-generates a per-company sequence
+  // (INV-{year}-{0001}) and pulls the total from the parent order's items.
+  invoiceNumber: z.string().trim().max(100).optional(),
   status: invoiceStatus.default("draft"),
-  totalAmount: requiredDecimal,
+  totalAmount: decimalField,
   dueDate: isoDateNullable,
   paidAt: isoDateNullable,
 });
@@ -171,6 +174,21 @@ export const proposalBodySchema = z.object({
   sentAt: isoDateNullable,
   // Content is free-form proposal body. Cap to avoid runaway payloads.
   content: z.string().max(50_000).nullable().optional(),
+  // Email subject + rendered HTML. Stored on the proposal so we can
+  // re-send or re-render the public page without recomputing.
+  subject: optionalTrimmed(500),
+  bodyHtml: z.string().max(200_000).nullable().optional(),
+});
+
+export const proposalSendSchema = z.object({
+  // Override the stored subject/body if supplied; otherwise the route
+  // handler falls back to whatever is already on the proposal row.
+  subject: z.string().trim().min(1).max(500).optional(),
+  bodyHtml: z.string().min(1).max(200_000).optional(),
+  // If the caller omits the recipient, we pull it from the parent
+  // enquiry's clientEmail.
+  recipientEmail: z.string().trim().email().optional(),
+  recipientName: z.string().trim().max(200).optional(),
 });
 
 /* ------------------------------- products ------------------------------- */

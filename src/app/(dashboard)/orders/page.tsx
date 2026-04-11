@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit2, Trash2 } from "lucide-react";
+import { Plus, Edit2, Trash2, ExternalLink } from "lucide-react";
+import Link from "next/link";
 import { OrderModal } from "@/components/orders/order-modal";
 import { Can } from "@/components/auth/can";
 
@@ -208,12 +209,12 @@ export default function OrdersPage() {
                     className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
                   >
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      <button
-                        onClick={() => handleOpenModal(order)}
+                      <Link
+                        href={`/orders/${order.id}`}
                         className="text-[#1B4332] hover:underline font-medium"
                       >
                         {order.enquiry?.clientName || "Unknown"}
-                      </button>
+                      </Link>
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <Badge variant={statusColors[order.status as keyof typeof statusColors]}>
@@ -231,6 +232,13 @@ export default function OrdersPage() {
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <div className="flex items-center gap-2">
+                        <Link
+                          href={`/orders/${order.id}`}
+                          className="p-1 text-gray-600 hover:text-[#1B4332] hover:bg-gray-100 rounded transition-colors"
+                          title="View"
+                        >
+                          <ExternalLink size={16} />
+                        </Link>
                         <button
                           onClick={() => handleOpenModal(order)}
                           className="p-1 text-gray-600 hover:text-[#1B4332] hover:bg-gray-100 rounded transition-colors"
