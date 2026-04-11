@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Trash2, Plus } from "lucide-react";
@@ -294,7 +295,7 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
     e.preventDefault();
 
     if (!formData.enquiryId) {
-      alert("Please select an enquiry");
+      toast.error("Please select an enquiry");
       return;
     }
 
@@ -309,7 +310,7 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
       onClose();
     } catch (error) {
       console.error("Error saving order:", error);
-      alert("Failed to save order");
+      toast.error("Failed to save order");
     } finally {
       setLoading(false);
     }

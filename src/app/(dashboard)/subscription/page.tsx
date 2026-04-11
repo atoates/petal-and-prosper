@@ -1,5 +1,6 @@
 "use client";
 
+import toast from "react-hot-toast";
 import { Card, CardHeader, CardBody, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -52,8 +53,8 @@ export default function SubscriptionPage() {
           </div>
         </CardBody>
         <CardFooter className="space-x-4">
-          <Button variant="outline" onClick={() => alert("Plan management will be available once billing integration is set up.")}>Change Plan</Button>
-          <Button variant="outline" onClick={() => alert("Subscription cancellation will be available once billing integration is set up.")}>Cancel Subscription</Button>
+          <Button variant="outline" onClick={() => toast("Plan management will be available once billing integration is set up.")}>Change Plan</Button>
+          <Button variant="outline" onClick={() => toast("Subscription cancellation will be available once billing integration is set up.")}>Cancel Subscription</Button>
         </CardFooter>
       </Card>
 
@@ -98,7 +99,7 @@ export default function SubscriptionPage() {
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <button
-                      onClick={() => alert("Invoice downloads will be available once billing integration is set up.")}
+                      onClick={() => toast("Invoice downloads will be available once billing integration is set up.")}
                       className="text-primary-green hover:text-light-green font-medium"
                     >
                       Download

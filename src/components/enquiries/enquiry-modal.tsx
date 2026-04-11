@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X } from "lucide-react";
@@ -105,7 +106,7 @@ export function EnquiryModal({
     e.preventDefault();
 
     if (!formData.clientName || !formData.clientEmail) {
-      alert("Client name and email are required");
+      toast.error("Client name and email are required");
       return;
     }
 
@@ -115,7 +116,7 @@ export function EnquiryModal({
       onClose();
     } catch (error) {
       console.error("Error saving enquiry:", error);
-      alert("Failed to save enquiry");
+      toast.error("Failed to save enquiry");
     } finally {
       setLoading(false);
     }

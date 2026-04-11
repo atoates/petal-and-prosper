@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -162,7 +163,7 @@ export default function OrdersPage() {
       setOrders(sortByEventDate(data));
     } catch (err) {
       console.error("Error deleting order:", err);
-      alert("Failed to delete order");
+      toast.error("Failed to delete order");
     }
   };
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardFooter } from "@/components/ui/card";
 import { Plus, Download } from "lucide-react";
@@ -151,7 +152,7 @@ export default function ProposalsPage() {
       document.body.removeChild(a);
     } catch (err) {
       console.error("Error downloading PDF:", err);
-      alert("Failed to download proposal PDF");
+      toast.error("Failed to download proposal PDF");
     } finally {
       setDownloadingId(null);
     }

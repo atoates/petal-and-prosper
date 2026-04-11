@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -154,7 +155,7 @@ export default function EnquiriesPage() {
       router.push(`/orders/${created.id}`);
     } catch (err) {
       console.error("Error creating order from enquiry:", err);
-      alert("Failed to create order for this enquiry");
+      toast.error("Failed to create order for this enquiry");
       setCreatingOrderFor(null);
     }
   };
@@ -179,7 +180,7 @@ export default function EnquiriesPage() {
       setFilteredEnquiries(data);
     } catch (err) {
       console.error("Error deleting enquiry:", err);
-      alert("Failed to delete enquiry");
+      toast.error("Failed to delete enquiry");
     }
   };
 

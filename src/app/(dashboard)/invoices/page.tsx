@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -284,7 +285,7 @@ export default function InvoicesPage() {
       document.body.removeChild(a);
     } catch (err) {
       console.error("Error downloading PDF:", err);
-      alert("Failed to download invoice PDF");
+      toast.error("Failed to download invoice PDF");
     } finally {
       setDownloadingId(null);
     }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -222,7 +223,9 @@ export default function OrderDetailPage() {
       const data = await res.json();
       setOrder(data.order);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to apply pricing");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to apply pricing"
+      );
     } finally {
       setApplyingPricing(false);
     }
@@ -255,11 +258,14 @@ export default function OrderDetailPage() {
         const all: ProposalRow[] = await refreshed.json();
         setProposals(all.filter((p) => p.orderId === id));
       }
-      alert(
-        `Proposal sent (${data.provider}). Public link:\n${data.publicLink}`
+      toast.success(
+        `Proposal sent (${data.provider}). Public link: ${data.publicLink}`,
+        { duration: 8000 }
       );
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to send proposal");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to send proposal"
+      );
     } finally {
       setSendingProposalId(null);
     }
@@ -285,7 +291,9 @@ export default function OrderDetailPage() {
       setInvoices((prev) => [...prev, inv]);
       setActiveTab("invoice");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to create invoice");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to create invoice"
+      );
     }
   };
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Crimson_Text, Inter } from "next/font/google";
+import { Toaster } from "react-hot-toast";
 import "./globals.css";
 import AuthProvider from "@/components/providers/session-provider";
 
@@ -29,6 +30,23 @@ export default function RootLayout({
     <html lang="en" className={`${seriffont.variable} ${sansFont.variable}`}>
       <body className="bg-[#FFF8F0] font-sans">
         <AuthProvider>{children}</AuthProvider>
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: "#fff",
+              color: "#1f2937",
+              border: "1px solid #e5e7eb",
+            },
+            success: {
+              iconTheme: { primary: "#16a34a", secondary: "#fff" },
+            },
+            error: {
+              iconTheme: { primary: "#dc2626", secondary: "#fff" },
+            },
+          }}
+        />
       </body>
     </html>
   );
