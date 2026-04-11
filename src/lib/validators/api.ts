@@ -33,19 +33,6 @@ const decimalField = z
     return n.toString();
   });
 
-// Required decimal variant -- rejects null/empty.
-const requiredDecimal = z
-  .union([z.string(), z.number()])
-  .refine(
-    (v) => {
-      if (typeof v === "string" && v.trim() === "") return false;
-      const n = Number(v);
-      return Number.isFinite(n);
-    },
-    { message: "Must be a number" }
-  )
-  .transform((v) => Number(v).toString());
-
 const isoDateNullable = z
   .union([z.string(), z.date()])
   .nullable()
@@ -116,12 +103,6 @@ export const orderStatus = z.enum([
   "completed",
 ]);
 
-export const orderCreateSchema = z.object({
-  enquiryId: optionalTrimmed(100),
-  status: orderStatus.default("draft"),
-  totalPrice: decimalField,
-});
-
 export const orderItemBodySchema = z.object({
   id: z.string().optional(),
   description: requiredTrimmed("Description", 500),
@@ -129,8 +110,28 @@ export const orderItemBodySchema = z.object({
   quantity: z.coerce.number().int("Quantity must be whole").positive(
     "Quantity must be positive"
   ),
-  unitPrice: requiredDecimal,
-  totalPrice: requiredDecimal,
+  // baseCost is what the florist pays for one unit, ex-VAT. When
+  // supplied, the server runs the pricing engine and derives
+  // unitPrice/totalPrice automatically. Optional for backwards
+  // compatibility: legacy clients can still post a unitPrice directly
+  // and we persist it as a manual override.
+  baseCost: decimalField,
+  // unitPrice and totalPrice are optional at the wire level because
+  // the server derives them from baseCost + rules when possible. They
+  // remain required once they hit the DB, so every handler that
+  // consumes this schema runs the input through the pricing helper.
+  unitPrice: decimalField,
+  totalPrice: decimalField,
+});
+
+export const orderCreateSchema = z.object({
+  enquiryId: optionalTrimmed(100),
+  status: orderStatus.default("draft"),
+  totalPrice: decimalField,
+  // Items are optional on create. When supplied the server will
+  // transactionally insert them (auto-priced via the pricing engine)
+  // and recompute the order total from the sum of items.
+  items: z.array(orderItemBodySchema).optional(),
 });
 
 export const orderUpdateSchema = z.object({

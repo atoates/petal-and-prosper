@@ -7,6 +7,11 @@ import {
   parseJsonBody,
   orderItemCreateSchema,
 } from "@/lib/validators/api";
+import {
+  loadRules,
+  priceItemForCompany,
+  recomputeOrderTotal,
+} from "@/lib/pricing/server";
 
 async function assertOrderBelongsToTenant(
   orderId: string,
@@ -70,20 +75,37 @@ export async function POST(
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    const result = await db
-      .insert(orderItems)
-      .values({
-        id: crypto.randomUUID(),
-        orderId: id,
+    const rules = await loadRules(ctx.companyId);
+    const priced = priceItemForCompany(
+      {
         description: data.description,
         category: data.category,
         quantity: data.quantity,
+        baseCost: data.baseCost,
         unitPrice: data.unitPrice,
-        totalPrice: data.totalPrice,
-      })
-      .returning();
+      },
+      rules
+    );
 
-    return NextResponse.json(result[0], { status: 201 });
+    const result = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(orderItems)
+        .values({
+          id: crypto.randomUUID(),
+          orderId: id,
+          description: priced.description,
+          category: priced.category,
+          quantity: priced.quantity,
+          baseCost: priced.baseCost,
+          unitPrice: priced.unitPrice,
+          totalPrice: priced.totalPrice,
+        })
+        .returning();
+      await recomputeOrderTotal(tx, id, ctx.companyId);
+      return row;
+    });
+
+    return NextResponse.json(result, { status: 201 });
   } catch (error) {
     console.error(
       "Error creating order item:",

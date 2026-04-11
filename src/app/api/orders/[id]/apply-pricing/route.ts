@@ -82,11 +82,17 @@ export async function POST(
       staffMargin: settings.staffMargin,
     });
 
+    // Prefer the persisted baseCost column when present. That's the
+    // authoritative "what did the florist pay" value stamped in by
+    // the auto-pricing flow. For legacy rows that predate baseCost we
+    // fall back to treating unitPrice as the cost -- the same
+    // behaviour this route used to have -- so applying pricing still
+    // works on historical orders.
     const inputs = (parent.items || []).map((item) => ({
       description: item.description,
       category: item.category,
       quantity: item.quantity,
-      baseCost: parseFloat(item.unitPrice),
+      baseCost: parseFloat(item.baseCost ?? item.unitPrice),
     }));
 
     const result = applyPricing(inputs, rules, opts);
@@ -100,6 +106,10 @@ export async function POST(
         await tx
           .update(orderItems)
           .set({
+            // Persist the baseCost used for this calculation so the
+            // next re-apply is deterministic even if someone hand-edits
+            // the unitPrice in between.
+            baseCost: priced.baseCost.toFixed(2),
             unitPrice: priced.unitPrice.toFixed(2),
             totalPrice: priced.totalPrice.toFixed(2),
           })

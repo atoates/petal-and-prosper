@@ -182,6 +182,14 @@ export const orderItems = pgTable(
     description: text("description").notNull(),
     category: varchar("category", { length: 100 }),
     quantity: integer("quantity").notNull(),
+    // baseCost is what the florist pays for one unit (ex-VAT). The
+    // pricing engine reads this column when applying markup / buffer
+    // rules, so we can always re-derive unitPrice from first
+    // principles rather than trying to reverse-engineer a sell price.
+    // Nullable for legacy rows created before auto-pricing was wired
+    // in; those rows fall back to treating unitPrice as the base cost
+    // in the apply-pricing route.
+    baseCost: decimal("base_cost", { precision: 10, scale: 2 }),
     unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
     totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
     createdAt: timestamp("created_at").defaultNow(),

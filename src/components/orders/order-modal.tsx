@@ -11,8 +11,19 @@ interface OrderItem {
   description: string;
   category?: string;
   quantity: number;
+  // What the florist paid for one unit, ex-VAT. When present, the
+  // unit price is derived from this by applying the tenant's pricing
+  // rules (markup multiple, flower buffer). When absent, the user
+  // typed a unit price directly and we persist that as a manual
+  // override.
+  baseCost?: string;
   unitPrice: string;
   totalPrice: string;
+}
+
+interface PricingRulesShape {
+  multiple: number;
+  flowerBuffer: number;
 }
 
 interface Order {
@@ -61,11 +72,34 @@ const CATEGORY_OPTIONS = [
   "accessory",
 ];
 
+const FLOWER_CATEGORIES = new Set(["flower", "foliage"]);
+
+/**
+ * Mirror of the server-side markup-for-category rule. We duplicate
+ * the tiny calculation here so the modal can preview the marked-up
+ * sell price as the user types, without round-tripping to the API
+ * on every keystroke. The server always re-runs the calculation
+ * authoritatively on save.
+ */
+function deriveUnitPrice(
+  baseCost: number,
+  category: string | undefined,
+  rules: PricingRulesShape | null
+): number {
+  if (!rules) return baseCost;
+  const cat = (category || "").toLowerCase();
+  const markup = FLOWER_CATEGORIES.has(cat)
+    ? rules.flowerBuffer * rules.multiple
+    : rules.multiple;
+  return Math.round(baseCost * markup * 100) / 100;
+}
+
 export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) {
   const [loading, setLoading] = useState(false);
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
   const [enquiriesLoading, setEnquiriesLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
+  const [rules, setRules] = useState<PricingRulesShape | null>(null);
   const [formData, setFormData] = useState<Partial<Order>>({
     enquiryId: "",
     status: "draft",
@@ -101,8 +135,30 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
       }
     };
 
+    // Fetch the tenant's pricing rules so the modal can preview
+    // marked-up unit prices as the user types. If this fails we
+    // degrade gracefully to "no markup" preview -- the server still
+    // runs the real calculation on save.
+    const fetchRules = async () => {
+      try {
+        const response = await fetch("/api/settings/pricing");
+        if (response.ok) {
+          const data = await response.json();
+          const multiple = Number(data.multiple ?? 2.5);
+          const flowerBuffer = Number(data.flowerBuffer ?? 1.15);
+          setRules({
+            multiple: Number.isFinite(multiple) ? multiple : 2.5,
+            flowerBuffer: Number.isFinite(flowerBuffer) ? flowerBuffer : 1.15,
+          });
+        }
+      } catch {
+        // pricing rules are optional for preview purposes
+      }
+    };
+
     fetchEnquiries();
     fetchProducts();
+    fetchRules();
   }, []);
 
   useEffect(() => {
@@ -145,12 +201,27 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
 
     item[field] = value;
 
-    // Recalculate total price if quantity or unit price changed
-    if (field === "quantity" || field === "unitPrice") {
-      const quantity = parseFloat(item.quantity) || 0;
-      const unitPrice = parseFloat(item.unitPrice) || 0;
-      item.totalPrice = (quantity * unitPrice).toFixed(2);
+    // When the user types a base cost, auto-derive the marked-up unit
+    // price using the tenant's rules (same calculation the server will
+    // run on save). If they edit unitPrice directly we treat that as a
+    // manual override and clear baseCost so the next save doesn't
+    // silently re-apply markup on top.
+    if (field === "baseCost" || field === "category" || field === "quantity") {
+      const baseCost = parseFloat(item.baseCost);
+      if (Number.isFinite(baseCost) && baseCost > 0) {
+        const unitPrice = deriveUnitPrice(baseCost, item.category, rules);
+        item.unitPrice = unitPrice.toFixed(2);
+      }
     }
+    if (field === "unitPrice") {
+      // Manual override: wipe baseCost so the server persists the
+      // typed unitPrice as-is rather than re-marking up.
+      item.baseCost = "";
+    }
+
+    const quantity = parseFloat(item.quantity) || 0;
+    const unitPrice = parseFloat(item.unitPrice) || 0;
+    item.totalPrice = (quantity * unitPrice).toFixed(2);
 
     setFormData((prev) => ({
       ...prev,
@@ -164,6 +235,7 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
       description: "",
       category: "",
       quantity: 1,
+      baseCost: "",
       unitPrice: "0.00",
       totalPrice: "0.00",
     };
@@ -179,15 +251,24 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
     const item = items[index];
     if (!item) return;
 
-    const unitPrice = product.retailPrice
+    // Prefer wholesalePrice as the base cost -- that's what the
+    // florist actually pays. retailPrice is kept as a sensible
+    // fallback for products that only have a sell price on record.
+    const baseCost = product.wholesalePrice
+      ? parseFloat(product.wholesalePrice)
+      : product.retailPrice
       ? parseFloat(product.retailPrice)
       : 0;
+    const category = product.category || item.category;
+    const unitPrice =
+      baseCost > 0 ? deriveUnitPrice(baseCost, category, rules) : 0;
     const quantity = parseFloat(String(item.quantity)) || 1;
 
     items[index] = {
       ...item,
       description: product.name + (product.colour ? ` — ${product.colour}` : ""),
-      category: product.category || item.category,
+      category,
+      baseCost: baseCost > 0 ? baseCost.toFixed(2) : "",
       unitPrice: unitPrice.toFixed(2),
       totalPrice: (quantity * unitPrice).toFixed(2),
     };
@@ -329,7 +410,7 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
                   key={item.id}
                   className="border border-gray-200 rounded-lg p-4 space-y-3"
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-8 gap-3">
                     <div className="md:col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Description
@@ -384,6 +465,33 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
                         min="1"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4332] focus:border-transparent transition-colors text-sm"
                       />
+                    </div>
+
+                    <div>
+                      <label
+                        className="block text-xs font-medium text-gray-700 mb-1"
+                        title="What you pay for one unit. Sell price is derived from this."
+                      >
+                        Cost
+                      </label>
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm text-gray-500">£</span>
+                        <input
+                          type="number"
+                          value={item.baseCost || ""}
+                          onChange={(e) =>
+                            handleItemChange(
+                              index,
+                              "baseCost",
+                              e.target.value
+                            )
+                          }
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4332] focus:border-transparent transition-colors text-sm"
+                        />
+                      </div>
                     </div>
 
                     <div>

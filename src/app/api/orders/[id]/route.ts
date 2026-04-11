@@ -4,6 +4,11 @@ import { orders, orderItems, enquiries } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
 import { parseJsonBody, orderUpdateSchema } from "@/lib/validators/api";
+import {
+  loadRules,
+  priceItemForCompany,
+  recomputeOrderTotal,
+} from "@/lib/pricing/server";
 
 export async function GET(
   _request: NextRequest,
@@ -69,6 +74,12 @@ export async function PUT(
       }
     }
 
+    // Pricing rules are loaded once before the transaction so that
+    // every item update/insert goes through the same snapshot of the
+    // tenant's markup config, rather than one item racing a concurrent
+    // Pricing page save.
+    const rules = await loadRules(ctx.companyId);
+
     const updated = await db.transaction(async (tx) => {
       // Update the order, scoped to tenant
       const updateResult = await tx
@@ -117,15 +128,26 @@ export async function PUT(
         }
 
         for (const item of incoming) {
+          const priced = priceItemForCompany(
+            {
+              description: item.description,
+              category: item.category,
+              quantity: item.quantity,
+              baseCost: item.baseCost,
+              unitPrice: item.unitPrice,
+            },
+            rules
+          );
           if (item.id && !item.id.startsWith("new-")) {
             await tx
               .update(orderItems)
               .set({
-                description: item.description,
-                category: item.category,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice,
-                totalPrice: item.totalPrice,
+                description: priced.description,
+                category: priced.category,
+                quantity: priced.quantity,
+                baseCost: priced.baseCost,
+                unitPrice: priced.unitPrice,
+                totalPrice: priced.totalPrice,
               })
               .where(
                 and(
@@ -137,14 +159,20 @@ export async function PUT(
             await tx.insert(orderItems).values({
               id: crypto.randomUUID(),
               orderId: params.id,
-              description: item.description,
-              category: item.category,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              totalPrice: item.totalPrice,
+              description: priced.description,
+              category: priced.category,
+              quantity: priced.quantity,
+              baseCost: priced.baseCost,
+              unitPrice: priced.unitPrice,
+              totalPrice: priced.totalPrice,
             });
           }
         }
+
+        // Any time the items change, recompute the order total from
+        // the authoritative set of items rather than trusting the
+        // totalPrice in the request body.
+        await recomputeOrderTotal(tx, params.id, ctx.companyId);
       }
 
       return tx.query.orders.findFirst({
