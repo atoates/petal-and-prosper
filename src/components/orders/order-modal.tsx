@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Trash2, Plus } from "lucide-react";
+import { ProductAutocomplete } from "./product-autocomplete";
 
 interface OrderItem {
   id: string;
@@ -33,6 +34,16 @@ interface Enquiry {
   clientEmail: string;
 }
 
+interface Product {
+  id: string;
+  name: string;
+  category: string;
+  wholesalePrice?: string;
+  retailPrice?: string;
+  colour?: string;
+  unit?: string;
+}
+
 interface OrderModalProps {
   isOpen: boolean;
   order?: Order | null;
@@ -54,6 +65,7 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
   const [loading, setLoading] = useState(false);
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
   const [enquiriesLoading, setEnquiriesLoading] = useState(true);
+  const [products, setProducts] = useState<Product[]>([]);
   const [formData, setFormData] = useState<Partial<Order>>({
     enquiryId: "",
     status: "draft",
@@ -77,7 +89,20 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
       }
     };
 
+    const fetchProducts = async () => {
+      try {
+        const response = await fetch("/api/products");
+        if (response.ok) {
+          const data = await response.json();
+          setProducts(data.filter((p: Product) => p.category));
+        }
+      } catch {
+        // Products are optional — autocomplete just won't show suggestions
+      }
+    };
+
     fetchEnquiries();
+    fetchProducts();
   }, []);
 
   useEffect(() => {
@@ -147,6 +172,27 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
       ...prev,
       items: [...(prev.items || []), newItem],
     }));
+  };
+
+  const handleProductSelect = (index: number, product: Product) => {
+    const items = [...(formData.items || [])];
+    const item = items[index];
+    if (!item) return;
+
+    const unitPrice = product.retailPrice
+      ? parseFloat(product.retailPrice)
+      : 0;
+    const quantity = parseFloat(String(item.quantity)) || 1;
+
+    items[index] = {
+      ...item,
+      description: product.name + (product.colour ? ` — ${product.colour}` : ""),
+      category: product.category || item.category,
+      unitPrice: unitPrice.toFixed(2),
+      totalPrice: (quantity * unitPrice).toFixed(2),
+    };
+
+    setFormData((prev) => ({ ...prev, items }));
   };
 
   const handleRemoveItem = (index: number) => {
@@ -288,14 +334,16 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Description
                       </label>
-                      <input
-                        type="text"
+                      <ProductAutocomplete
                         value={item.description}
-                        onChange={(e) =>
-                          handleItemChange(index, "description", e.target.value)
+                        products={products}
+                        onChange={(val) =>
+                          handleItemChange(index, "description", val)
                         }
-                        placeholder="e.g. Roses - Red"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4332] focus:border-transparent transition-colors text-sm"
+                        onSelect={(product) =>
+                          handleProductSelect(index, product)
+                        }
+                        placeholder="Search products or type freely..."
                       />
                     </div>
 
