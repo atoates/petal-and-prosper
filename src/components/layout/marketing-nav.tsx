@@ -15,9 +15,15 @@ export function MarketingNav() {
   }, []);
 
   const navBase = "sticky top-0 z-50 transition-all duration-300";
+  // Nav is `sticky` not `fixed`, so at scroll=0 it sits in document flow
+  // above the hero, on top of the body cream background — not over the
+  // hero. A transparent nav there shows cream behind it, making white
+  // text invisible. At scroll=0 we therefore paint the nav the same dark
+  // forest green as the hero so it reads as a seamless cap, then flip to
+  // white-on-scroll as the content below goes light.
   const navBg = scrolled
     ? "bg-white border-b border-gray-200 shadow-sm"
-    : "bg-transparent border-b border-white/10";
+    : "bg-[#1B4332] border-b border-white/5";
 
   const textColor = scrolled ? "text-[#1B4332]" : "text-white";
   const linkColor = scrolled
