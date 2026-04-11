@@ -27,7 +27,7 @@ interface ProductionTask {
 interface ProductionSchedule {
   id: string;
   orderId: string;
-  eventDate?: string | null;
+  productionDate?: string | null;
   items?: string | null;
   assignedTo?: string | null;
   tasks?: string | null;
@@ -114,7 +114,7 @@ export default function ProductionPage() {
 
   const [formData, setFormData] = useState({
     orderId: "",
-    eventDate: "",
+    productionDate: "",
     notes: "",
     status: "not_started",
     assignedTo: "",
@@ -168,7 +168,7 @@ export default function ProductionPage() {
   const resetForm = () => {
     setFormData({
       orderId: "",
-      eventDate: "",
+      productionDate: "",
       notes: "",
       status: "not_started",
       assignedTo: "",
@@ -188,8 +188,8 @@ export default function ProductionPage() {
     setEditing(schedule);
     setFormData({
       orderId: schedule.orderId,
-      eventDate: schedule.eventDate
-        ? new Date(schedule.eventDate).toISOString().slice(0, 10)
+      productionDate: schedule.productionDate
+        ? new Date(schedule.productionDate).toISOString().slice(0, 10)
         : "",
       notes: schedule.notes || "",
       status: schedule.status,
@@ -241,8 +241,8 @@ export default function ProductionPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.orderId || !formData.eventDate) {
-      setError("Order and event date are required");
+    if (!formData.orderId || !formData.productionDate) {
+      setError("Order and production date are required");
       return;
     }
 
@@ -252,7 +252,7 @@ export default function ProductionPage() {
 
       const payload = {
         orderId: formData.orderId,
-        eventDate: formData.eventDate,
+        productionDate: formData.productionDate,
         notes: formData.notes || null,
         status: formData.status,
         assignedTo: formData.assignedTo || null,
@@ -267,7 +267,7 @@ export default function ProductionPage() {
       const method = editing ? "PATCH" : "POST";
       const body = editing
         ? JSON.stringify({
-            eventDate: payload.eventDate,
+            productionDate: payload.productionDate,
             notes: payload.notes,
             status: payload.status,
             assignedTo: payload.assignedTo,
@@ -404,7 +404,7 @@ export default function ProductionPage() {
                     className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
                   >
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {formatDate(schedule.eventDate)}
+                      {formatDate(schedule.productionDate)}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {schedule.order?.enquiry?.clientName || "Unknown"}
@@ -506,15 +506,15 @@ export default function ProductionPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Event Date
+                      Production Date
                     </label>
                     <Input
                       type="date"
-                      value={formData.eventDate}
+                      value={formData.productionDate}
                       onChange={(e) =>
                         setFormData({
                           ...formData,
-                          eventDate: e.target.value,
+                          productionDate: e.target.value,
                         })
                       }
                       className="w-full"

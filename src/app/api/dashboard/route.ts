@@ -61,32 +61,32 @@ export async function GET(_request: NextRequest) {
       db.query.deliverySchedules.findMany({
         where: and(
           eq(deliverySchedules.companyId, ctx.companyId),
-          gte(deliverySchedules.eventDate, todayStart),
-          lte(deliverySchedules.eventDate, todayEnd)
+          gte(deliverySchedules.deliveryDate, todayStart),
+          lte(deliverySchedules.deliveryDate, todayEnd)
         ),
         with: { order: { with: { enquiry: true } } },
       }),
       db.query.productionSchedules.findMany({
         where: and(
           eq(productionSchedules.companyId, ctx.companyId),
-          gte(productionSchedules.eventDate, todayStart),
-          lte(productionSchedules.eventDate, todayEnd)
+          gte(productionSchedules.productionDate, todayStart),
+          lte(productionSchedules.productionDate, todayEnd)
         ),
         with: { order: { with: { enquiry: true } } },
       }),
       db.query.productionSchedules.findMany({
         where: and(
           eq(productionSchedules.companyId, ctx.companyId),
-          gte(productionSchedules.eventDate, todayStart),
-          lte(productionSchedules.eventDate, weekEnd)
+          gte(productionSchedules.productionDate, todayStart),
+          lte(productionSchedules.productionDate, weekEnd)
         ),
         with: { order: { with: { enquiry: true } } },
       }),
       db.query.deliverySchedules.findMany({
         where: and(
           eq(deliverySchedules.companyId, ctx.companyId),
-          gte(deliverySchedules.eventDate, todayStart),
-          lte(deliverySchedules.eventDate, weekEnd)
+          gte(deliverySchedules.deliveryDate, todayStart),
+          lte(deliverySchedules.deliveryDate, weekEnd)
         ),
         with: { order: { with: { enquiry: true } } },
       }),
@@ -152,14 +152,14 @@ export async function GET(_request: NextRequest) {
           status: d.status,
           clientName: d.order?.enquiry?.clientName || "Unknown",
           venue: d.order?.enquiry?.venueA || null,
-          eventDate: d.eventDate,
+          deliveryDate: d.deliveryDate,
         })),
         production: todaysProduction.map((p) => ({
           id: p.id,
           orderId: p.orderId,
           status: p.status,
           clientName: p.order?.enquiry?.clientName || "Unknown",
-          eventDate: p.eventDate,
+          productionDate: p.productionDate,
         })),
       },
       thisWeek: {
@@ -168,14 +168,14 @@ export async function GET(_request: NextRequest) {
           orderId: p.orderId,
           status: p.status,
           clientName: p.order?.enquiry?.clientName || "Unknown",
-          eventDate: p.eventDate,
+          productionDate: p.productionDate,
         })),
         deliveries: thisWeekDeliveries.map((d) => ({
           id: d.id,
           orderId: d.orderId,
           status: d.status,
           clientName: d.order?.enquiry?.clientName || "Unknown",
-          eventDate: d.eventDate,
+          deliveryDate: d.deliveryDate,
         })),
       },
       needsAttention: {

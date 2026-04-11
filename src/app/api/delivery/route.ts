@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         id: crypto.randomUUID(),
         companyId: ctx.companyId,
         orderId: data.orderId,
-        eventDate: data.eventDate,
+        deliveryDate: data.deliveryDate,
         deliveryAddress: data.deliveryAddress,
         venueId: data.venueId,
         driverId: data.driverId,

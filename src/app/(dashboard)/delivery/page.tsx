@@ -22,7 +22,7 @@ import { Can } from "@/components/auth/can";
 interface DeliverySchedule {
   id: string;
   orderId: string;
-  eventDate?: string | null;
+  deliveryDate?: string | null;
   deliveryAddress?: string | null;
   venueId?: string | null;
   driverId?: string | null;
@@ -64,7 +64,7 @@ interface Venue {
 
 interface DeliveryForm {
   orderId: string;
-  eventDate: string;
+  deliveryDate: string;
   deliveryAddress: string;
   venueId: string;
   driverId: string;
@@ -138,7 +138,7 @@ export default function DeliveryPage() {
 
   const [formData, setFormData] = useState<DeliveryForm>({
     orderId: "",
-    eventDate: "",
+    deliveryDate: "",
     deliveryAddress: "",
     venueId: "",
     driverId: "",
@@ -204,7 +204,7 @@ export default function DeliveryPage() {
   const resetForm = () => {
     setFormData({
       orderId: "",
-      eventDate: "",
+      deliveryDate: "",
       deliveryAddress: "",
       venueId: "",
       driverId: "",
@@ -225,8 +225,8 @@ export default function DeliveryPage() {
     setEditing(schedule);
     setFormData({
       orderId: schedule.orderId,
-      eventDate: schedule.eventDate
-        ? new Date(schedule.eventDate).toISOString().slice(0, 10)
+      deliveryDate: schedule.deliveryDate
+        ? new Date(schedule.deliveryDate).toISOString().slice(0, 10)
         : "",
       deliveryAddress: schedule.deliveryAddress || "",
       venueId: schedule.venueId || "",
@@ -276,7 +276,7 @@ export default function DeliveryPage() {
 
     if (
       !formData.orderId ||
-      !formData.eventDate ||
+      !formData.deliveryDate ||
       !formData.deliveryAddress ||
       !formData.status
     ) {
@@ -289,7 +289,7 @@ export default function DeliveryPage() {
 
       const payload = {
         orderId: formData.orderId,
-        eventDate: formData.eventDate,
+        deliveryDate: formData.deliveryDate,
         deliveryAddress: formData.deliveryAddress,
         venueId: formData.venueId || null,
         driverId: formData.driverId || null,
@@ -306,7 +306,7 @@ export default function DeliveryPage() {
       const method = editing ? "PATCH" : "POST";
       const body = editing
         ? JSON.stringify({
-            eventDate: payload.eventDate,
+            deliveryDate: payload.deliveryDate,
             deliveryAddress: payload.deliveryAddress,
             venueId: payload.venueId,
             driverId: payload.driverId,
@@ -527,7 +527,7 @@ export default function DeliveryPage() {
                     className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
                   >
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {formatDate(schedule.eventDate)}
+                      {formatDate(schedule.deliveryDate)}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {schedule.timeSlot || "-"}
@@ -631,10 +631,10 @@ export default function DeliveryPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input
-                    label="Event Date"
+                    label="Delivery Date"
                     type="date"
-                    name="eventDate"
-                    value={formData.eventDate}
+                    name="deliveryDate"
+                    value={formData.deliveryDate}
                     onChange={handleFormChange}
                     required
                   />

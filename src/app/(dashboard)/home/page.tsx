@@ -26,7 +26,7 @@ interface DeliveryRow {
   status: string;
   clientName: string;
   venue?: string | null;
-  eventDate?: string | null;
+  deliveryDate?: string | null;
 }
 
 interface ProductionRow {
@@ -34,7 +34,7 @@ interface ProductionRow {
   orderId: string;
   status: string;
   clientName: string;
-  eventDate?: string | null;
+  productionDate?: string | null;
 }
 
 interface EnquiryRow {
@@ -322,7 +322,7 @@ export default function HomePage() {
                       </Link>
                     </div>
                     <span className="text-gray-500">
-                      {formatDay(p.eventDate)}
+                      {formatDay(p.productionDate)}
                     </span>
                   </li>
                 ))}
@@ -341,7 +341,7 @@ export default function HomePage() {
                       </Link>
                     </div>
                     <span className="text-gray-500">
-                      {formatDay(d.eventDate)}
+                      {formatDay(d.deliveryDate)}
                     </span>
                   </li>
                 ))}

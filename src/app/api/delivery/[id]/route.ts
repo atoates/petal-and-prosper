@@ -44,7 +44,7 @@ export async function PATCH(
     }
 
     const updates: Record<string, unknown> = { updatedAt: new Date() };
-    if (data.eventDate !== undefined) updates.eventDate = data.eventDate;
+    if (data.deliveryDate !== undefined) updates.deliveryDate = data.deliveryDate;
     if (data.deliveryAddress !== undefined)
       updates.deliveryAddress = data.deliveryAddress;
     if (data.venueId !== undefined) updates.venueId = data.venueId;

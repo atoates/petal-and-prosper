@@ -245,7 +245,7 @@ export const deliveryStatus = z.enum([
 
 export const deliveryBodySchema = z.object({
   orderId: requiredTrimmed("Order ID", 100),
-  eventDate: isoDateNullable,
+  deliveryDate: isoDateNullable,
   deliveryAddress: optionalTrimmed(500),
   venueId: optionalTrimmed(100),
   driverId: optionalTrimmed(100),
@@ -259,7 +259,7 @@ export const deliveryBodySchema = z.object({
 // Patch allows partial updates from the delivery UI -- dispatch
 // confirmation, driver reassignment, status flips, and so on.
 export const deliveryPatchSchema = z.object({
-  eventDate: isoDateNullable,
+  deliveryDate: isoDateNullable,
   deliveryAddress: optionalTrimmed(500),
   venueId: optionalTrimmed(100),
   driverId: optionalTrimmed(100),
@@ -288,7 +288,10 @@ export const productionTaskSchema = z.object({
 
 export const productionBodySchema = z.object({
   orderId: requiredTrimmed("Order ID", 100),
-  eventDate: isoDateNullable,
+  // Renamed from `eventDate` -- this column tracks the date the
+  // schedule's production work is being done, not the client event
+  // itself. The enquiry row still holds the real event date.
+  productionDate: isoDateNullable,
   items: z.unknown().optional(),
   assignedTo: optionalTrimmed(100),
   tasks: z.array(productionTaskSchema).nullable().optional(),
@@ -298,7 +301,7 @@ export const productionBodySchema = z.object({
 
 // Partial update variant for PATCH /api/production/[id].
 export const productionPatchSchema = z.object({
-  eventDate: isoDateNullable,
+  productionDate: isoDateNullable,
   items: z.unknown().optional(),
   assignedTo: optionalTrimmed(100),
   tasks: z.array(productionTaskSchema).nullable().optional(),

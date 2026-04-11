@@ -78,7 +78,7 @@ interface ProductionRow {
   id: string;
   orderId: string;
   status: string;
-  eventDate?: string;
+  productionDate?: string;
   notes?: string;
 }
 
@@ -86,7 +86,7 @@ interface DeliveryRow {
   id: string;
   orderId: string;
   status: string;
-  eventDate?: string;
+  deliveryDate?: string;
   deliveryAddress?: string;
 }
 
@@ -695,7 +695,7 @@ export default function OrderDetailPage() {
                   >
                     <div>
                       <div className="text-gray-900 font-medium">
-                        Scheduled for {formatDate(p.eventDate)}
+                        Scheduled for {formatDate(p.productionDate)}
                       </div>
                       {p.notes && (
                         <div className="text-xs text-gray-500">{p.notes}</div>
@@ -741,7 +741,7 @@ export default function OrderDetailPage() {
                   >
                     <div>
                       <div className="text-gray-900 font-medium">
-                        {formatDate(d.eventDate)}
+                        {formatDate(d.deliveryDate)}
                       </div>
                       {d.deliveryAddress && (
                         <div className="text-xs text-gray-500">

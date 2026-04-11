@@ -245,7 +245,7 @@ async function createTables(client: any) {
       id TEXT PRIMARY KEY,
       order_id TEXT NOT NULL,
       company_id TEXT NOT NULL,
-      event_date TIMESTAMP,
+      production_date TIMESTAMP,
       items TEXT,
       notes TEXT,
       status production_status DEFAULT 'not_started',
@@ -261,7 +261,7 @@ async function createTables(client: any) {
       id TEXT PRIMARY KEY,
       order_id TEXT NOT NULL,
       company_id TEXT NOT NULL,
-      event_date TIMESTAMP,
+      delivery_date TIMESTAMP,
       delivery_address TEXT,
       items TEXT,
       notes TEXT,
@@ -1022,11 +1022,13 @@ async function seedData(client: any) {
     );
   }
 
-  // Seed production schedules (5 production schedules)
+  // Seed production schedules (5 production schedules). These dates
+  // describe when the production work itself is planned, not the
+  // client event, hence `productionDate` rather than `eventDate`.
   const productionData = [
     {
       orderId: orderIds[0],
-      eventDate: new Date("2026-06-14"),
+      productionDate: new Date("2026-06-14"),
       items: JSON.stringify([
         { item: "Bridal Bouquet", status: "in_progress" },
         { item: "Bridesmaids Bouquets", status: "in_progress" },
@@ -1037,7 +1039,7 @@ async function seedData(client: any) {
     },
     {
       orderId: orderIds[1],
-      eventDate: new Date("2026-04-09"),
+      productionDate: new Date("2026-04-09"),
       items: JSON.stringify([
         { item: "Reception Arrangement", status: "completed" },
         { item: "50 Table Centrepieces", status: "in_progress" },
@@ -1047,7 +1049,7 @@ async function seedData(client: any) {
     },
     {
       orderId: orderIds[3],
-      eventDate: new Date("2026-09-11"),
+      productionDate: new Date("2026-09-11"),
       items: JSON.stringify([
         { item: "Bridal Bouquet", status: "not_started" },
         { item: "6 Bridesmaids Bouquets", status: "not_started" },
@@ -1059,7 +1061,7 @@ async function seedData(client: any) {
     },
     {
       orderId: orderIds[5],
-      eventDate: new Date("2026-05-09"),
+      productionDate: new Date("2026-05-09"),
       items: JSON.stringify([
         { item: "Baby Shower Arrangement", status: "completed" },
         { item: "Small Posies", status: "completed" },
@@ -1069,7 +1071,7 @@ async function seedData(client: any) {
     },
     {
       orderId: orderIds[7],
-      eventDate: new Date("2026-11-21"),
+      productionDate: new Date("2026-11-21"),
       items: JSON.stringify([
         { item: "Bridal Bouquet - Formal White", status: "not_started" },
         { item: "7 Bridesmaids Bouquets", status: "not_started" },
@@ -1083,13 +1085,13 @@ async function seedData(client: any) {
   for (const pd of productionData) {
     const productionId = randomUUID();
     await client.query(
-      `INSERT INTO production_schedules (id, order_id, company_id, event_date, items, notes, status, created_at, updated_at)
+      `INSERT INTO production_schedules (id, order_id, company_id, production_date, items, notes, status, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
       [
         productionId,
         pd.orderId,
         COMPANY_ID,
-        pd.eventDate,
+        pd.productionDate,
         pd.items,
         pd.notes,
         pd.status,
@@ -1097,11 +1099,13 @@ async function seedData(client: any) {
     );
   }
 
-  // Seed delivery schedules (5 delivery schedules)
+  // Seed delivery schedules (5 delivery schedules). `deliveryDate`
+  // is the date the flowers are being dropped off at the venue,
+  // which may or may not match the event start on the enquiry.
   const deliveryData = [
     {
       orderId: orderIds[0],
-      eventDate: new Date("2026-06-15"),
+      deliveryDate: new Date("2026-06-15"),
       deliveryAddress: "Chelsea Town Hall, King's Road, London, SW3 5EE",
       items: JSON.stringify([
         { item: "Bridal Bouquet", delivered: false },
@@ -1113,7 +1117,7 @@ async function seedData(client: any) {
     },
     {
       orderId: orderIds[1],
-      eventDate: new Date("2026-04-10"),
+      deliveryDate: new Date("2026-04-10"),
       deliveryAddress: "Canary Wharf Conference Centre, 40 Bank Street, London, E14 5ER",
       items: JSON.stringify([
         { item: "Reception Arrangement", delivered: false },
@@ -1124,7 +1128,7 @@ async function seedData(client: any) {
     },
     {
       orderId: orderIds[2],
-      eventDate: new Date("2026-04-05"),
+      deliveryDate: new Date("2026-04-05"),
       deliveryAddress: "St Mary Church, Kensington Church Street, London, W8 4LA",
       items: JSON.stringify([
         { item: "2 Funeral Wreaths", delivered: true },
@@ -1135,7 +1139,7 @@ async function seedData(client: any) {
     },
     {
       orderId: orderIds[5],
-      eventDate: new Date("2026-09-12"),
+      deliveryDate: new Date("2026-09-12"),
       deliveryAddress: "Tower Bridge Exhibition Hall, Tower Bridge, London, SE1 2UP",
       items: JSON.stringify([
         { item: "Bridal Bouquet", delivered: false },
@@ -1147,7 +1151,7 @@ async function seedData(client: any) {
     },
     {
       orderId: orderIds[9],
-      eventDate: new Date("2026-07-02"),
+      deliveryDate: new Date("2026-07-02"),
       deliveryAddress: "Alexandra Palace, Alexandra Palace Way, London, N22 7AY",
       items: JSON.stringify([
         { item: "Prom Entrance Flowers", delivered: false },
@@ -1161,13 +1165,13 @@ async function seedData(client: any) {
   for (const dd of deliveryData) {
     const deliveryId = randomUUID();
     await client.query(
-      `INSERT INTO delivery_schedules (id, order_id, company_id, event_date, delivery_address, items, notes, status, created_at, updated_at)
+      `INSERT INTO delivery_schedules (id, order_id, company_id, delivery_date, delivery_address, items, notes, status, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`,
       [
         deliveryId,
         dd.orderId,
         COMPANY_ID,
-        dd.eventDate,
+        dd.deliveryDate,
         dd.deliveryAddress,
         dd.items,
         dd.notes,

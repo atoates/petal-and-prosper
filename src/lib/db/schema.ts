@@ -280,7 +280,11 @@ export const productionSchedules = pgTable(
     id: text("id").primaryKey(),
     orderId: text("order_id").notNull(),
     companyId: text("company_id").notNull(),
-    eventDate: timestamp("event_date"),
+    // productionDate is the date the arrangements are built -- usually
+    // a day or two before the event itself. Previously called
+    // eventDate but that was misleading because the event typically
+    // falls after production finishes.
+    productionDate: timestamp("production_date"),
     items: text("items"),
     // assignedTo stores the user id of the team member leading this
     // production batch. Kept nullable so legacy rows stay valid.
@@ -301,7 +305,11 @@ export const deliverySchedules = pgTable(
     id: text("id").primaryKey(),
     orderId: text("order_id").notNull(),
     companyId: text("company_id").notNull(),
-    eventDate: timestamp("event_date"),
+    // deliveryDate is when the arrangements leave the studio --
+    // usually the day of the event. Previously called eventDate,
+    // but production and delivery both had an eventDate field which
+    // confused places that needed to tell them apart.
+    deliveryDate: timestamp("delivery_date"),
     deliveryAddress: text("delivery_address"),
     // Optional pointer to a saved venue for quick reuse. Nullable so
     // ad-hoc addresses still work without forcing a venue record.

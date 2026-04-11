@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
         id: crypto.randomUUID(),
         companyId: ctx.companyId,
         orderId: data.orderId,
-        eventDate: data.eventDate,
+        productionDate: data.productionDate,
         items:
           data.items === undefined || data.items === null
             ? null
