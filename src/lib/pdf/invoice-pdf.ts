@@ -14,6 +14,7 @@ interface CompanyInfo {
   contactNo?: string;
   website?: string;
   logoUrl?: string;
+  vatNumber?: string;
 }
 
 interface InvoiceData {
@@ -27,7 +28,14 @@ interface InvoiceData {
   venue?: string;
   items: OrderItem[];
   subtotal: number;
+  // VAT rate is a percentage (20 = 20 %). vatAmount is the actual
+  // money value of VAT applied to the subtotal. total is subtotal
+  // + vatAmount (or whatever override was persisted on the row).
+  vatRate?: number;
+  vatAmount?: number;
   total: number;
+  amountPaid?: number;
+  paymentMethod?: string;
   dueDate?: Date | string;
   paidDate?: Date | string;
   status: string;
@@ -65,6 +73,11 @@ export function generateInvoicePdf(data: InvoiceData): jsPDF {
   pdf.setFontSize(10);
   pdf.text(`Invoice Number: ${data.invoiceNumber}`, margin, currentY);
   currentY += 6;
+
+  if (data.company.vatNumber) {
+    pdf.text(`VAT Number: ${data.company.vatNumber}`, margin, currentY);
+    currentY += 6;
+  }
 
   const createdDate = new Date().toLocaleDateString("en-GB");
   pdf.text(`Date: ${createdDate}`, margin, currentY);
@@ -163,7 +176,9 @@ export function generateInvoicePdf(data: InvoiceData): jsPDF {
 
   currentY = (pdf as any).lastAutoTable.finalY + 10;
 
-  // Totals section
+  // Totals section -- subtotal, VAT (if applicable), total, and any
+  // recorded payment. VAT line only appears when there is actually a
+  // non-zero rate so VAT-exempt tenants don't see an "0 VAT" row.
   const totalX = pageWidth - margin - 50;
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(10);
@@ -174,12 +189,56 @@ export function generateInvoicePdf(data: InvoiceData): jsPDF {
   });
   currentY += 7;
 
+  if (data.vatRate && data.vatRate > 0) {
+    const vatLabel = `VAT (${data.vatRate.toFixed(2)}%):`;
+    const vatValue = (data.vatAmount ?? 0).toFixed(2);
+    pdf.text(vatLabel, totalX, currentY);
+    pdf.text(`GBP ${vatValue}`, pageWidth - margin, currentY, {
+      align: "right",
+    });
+    currentY += 7;
+  }
+
   pdf.setFontSize(12);
   pdf.setTextColor(27, 67, 50);
   pdf.text("TOTAL:", totalX, currentY);
   pdf.text(`GBP ${data.total.toFixed(2)}`, pageWidth - margin, currentY, {
     align: "right",
   });
+  currentY += 7;
+
+  if (data.amountPaid && data.amountPaid > 0) {
+    pdf.setFontSize(10);
+    pdf.setTextColor(0, 0, 0);
+    pdf.text("Paid:", totalX, currentY);
+    pdf.text(
+      `GBP ${data.amountPaid.toFixed(2)}`,
+      pageWidth - margin,
+      currentY,
+      { align: "right" }
+    );
+    currentY += 6;
+    const outstanding = Math.max(0, data.total - data.amountPaid);
+    if (outstanding > 0) {
+      pdf.text("Outstanding:", totalX, currentY);
+      pdf.text(
+        `GBP ${outstanding.toFixed(2)}`,
+        pageWidth - margin,
+        currentY,
+        { align: "right" }
+      );
+      currentY += 6;
+    }
+    if (data.paymentMethod) {
+      pdf.setFontSize(9);
+      pdf.text(
+        `Method: ${data.paymentMethod}`,
+        totalX,
+        currentY
+      );
+      currentY += 6;
+    }
+  }
 
   currentY += 15;
 

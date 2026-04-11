@@ -93,6 +93,20 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Password reset tokens. One row per "I forgot my password" request.
+// Tokens are opaque 32-byte hex strings; we store them hashed (sha256)
+// rather than in the clear so a DB read can't be replayed. expiresAt
+// is set to +60 minutes on creation. usedAt is stamped the first time
+// a reset succeeds so tokens are strictly single-use.
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  tokenHash: varchar("token_hash", { length: 128 }).notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const companies = pgTable("companies", {
   id: text("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
@@ -210,7 +224,24 @@ export const invoices = pgTable(
     companyId: text("company_id").notNull(),
     invoiceNumber: varchar("invoice_number", { length: 50 }).notNull().unique(),
     status: invoiceStatusEnum("status").default("draft"),
+    // Subtotal is the sum of order line items (pre-VAT). VAT rate is
+    // a percentage (e.g. "20.00" for 20 %). vatAmount is subtotal *
+    // rate / 100, persisted so historic invoices stay stable if a
+    // tenant later changes their default rate. totalAmount =
+    // subtotal + vatAmount and is the figure the client pays.
+    subtotal: decimal("subtotal", { precision: 10, scale: 2 }),
+    vatRate: decimal("vat_rate", { precision: 5, scale: 2 }).default("0"),
+    vatAmount: decimal("vat_amount", { precision: 10, scale: 2 }).default(
+      "0"
+    ),
     totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+    // Payment tracking. amountPaid is the running total the florist
+    // has received (supports partial payments); paymentMethod is a
+    // free-form tag (bank transfer, card, cash).
+    amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }).default(
+      "0"
+    ),
+    paymentMethod: varchar("payment_method", { length: 50 }),
     dueDate: timestamp("due_date"),
     paidAt: timestamp("paid_at"),
     createdAt: timestamp("created_at").defaultNow(),
@@ -242,6 +273,12 @@ export const productionSchedules = pgTable(
     companyId: text("company_id").notNull(),
     eventDate: timestamp("event_date"),
     items: text("items"),
+    // assignedTo stores the user id of the team member leading this
+    // production batch. Kept nullable so legacy rows stay valid.
+    assignedTo: text("assigned_to"),
+    // tasks is a JSON-stringified array of { id, label, done, assignedTo? }
+    // allowing a lightweight task breakdown without a whole new table.
+    tasks: text("tasks"),
     notes: text("notes"),
     status: productionStatusEnum("status").default("not_started"),
     createdAt: timestamp("created_at").defaultNow(),
@@ -257,6 +294,15 @@ export const deliverySchedules = pgTable(
     companyId: text("company_id").notNull(),
     eventDate: timestamp("event_date"),
     deliveryAddress: text("delivery_address"),
+    // Optional pointer to a saved venue for quick reuse. Nullable so
+    // ad-hoc addresses still work without forcing a venue record.
+    venueId: text("venue_id"),
+    // Driver is the user id of whoever will drive the delivery run.
+    driverId: text("driver_id"),
+    // Time slot is a free-form string like "09:00 - 10:30" so tenants
+    // aren't forced into a fixed slot schema. Structured enough for
+    // display, flexible enough for real world operations.
+    timeSlot: varchar("time_slot", { length: 50 }),
     items: text("items"),
     notes: text("notes"),
     status: deliveryStatusEnum("status").default("pending"),
@@ -264,6 +310,23 @@ export const deliverySchedules = pgTable(
     updatedAt: timestamp("updated_at").defaultNow(),
   }
 );
+
+/**
+ * Saved venues let teams reuse frequently-used delivery locations
+ * (churches, hotels, regular event spaces) without retyping the
+ * address every time. Scoped per company.
+ */
+export const venues = pgTable("venues", {
+  id: text("id").primaryKey(),
+  companyId: text("company_id").notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  address: text("address"),
+  contactName: varchar("contact_name", { length: 200 }),
+  contactPhone: varchar("contact_phone", { length: 50 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
 
 export const priceSettings = pgTable(
   "price_settings",
@@ -312,6 +375,15 @@ export const invoiceSettings = pgTable(
     paymentTerms: text("payment_terms"),
     bankDetails: text("bank_details"),
     notes: text("notes"),
+    // Tenant's default VAT rate (percentage). Used by POST /api/invoices
+    // when the body doesn't override vatRate. VAT-exempt tenants leave
+    // this at the "0" default. vatNumber is printed on PDFs for
+    // VAT-registered tenants.
+    defaultVatRate: decimal("default_vat_rate", {
+      precision: 5,
+      scale: 2,
+    }).default("0"),
+    vatNumber: varchar("vat_number", { length: 50 }),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
   }
@@ -372,6 +444,7 @@ export const companiesRelations = relations(companies, ({ many, one }) => ({
   wholesaleOrders: many(wholesaleOrders),
   productionSchedules: many(productionSchedules),
   deliverySchedules: many(deliverySchedules),
+  venues: many(venues),
   products: many(products),
   priceSettings: one(priceSettings),
   proposalSettings: one(proposalSettings),
@@ -479,8 +552,20 @@ export const deliverySchedulesRelations = relations(
       fields: [deliverySchedules.orderId],
       references: [orders.id],
     }),
+    venue: one(venues, {
+      fields: [deliverySchedules.venueId],
+      references: [venues.id],
+    }),
   })
 );
+
+export const venuesRelations = relations(venues, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [venues.companyId],
+    references: [companies.id],
+  }),
+  deliverySchedules: many(deliverySchedules),
+}));
 
 export const priceSettingsRelations = relations(priceSettings, ({ one }) => ({
   company: one(companies, {

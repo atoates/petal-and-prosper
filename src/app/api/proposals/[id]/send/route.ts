@@ -11,13 +11,18 @@ import crypto from "crypto";
 /**
  * POST /api/proposals/[id]/send
  *
- * Sends the proposal to the client via email. The flow:
+ * Dispatches the proposal to the client. The flow:
  *
  *   1. Verify the proposal is in this tenant.
  *   2. Resolve the recipient (explicit body field or enquiry.clientEmail).
  *   3. Ensure the proposal has a `publicToken` -- mint one if missing.
  *   4. Render (or reuse) the HTML body.
- *   5. Call the email service.
+ *   5. Hand off to the email service. Note: `src/lib/email/send.ts` is
+ *      currently stubbed -- it logs the outgoing email to stderr and
+ *      returns success without actually sending. The proposal row is
+ *      still marked `sent` and the public link is still returned, so
+ *      the florist can copy-paste the URL to the client in the
+ *      meantime. When SMTP is wired back in, no change is needed here.
  *   6. Update the proposal row: status='sent', sentAt=now, subject,
  *      bodyHtml, publicToken.
  *

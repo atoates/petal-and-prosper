@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Download } from "lucide-react";
+import { Plus, Download, CreditCard } from "lucide-react";
 import { ColDef } from "ag-grid-community";
 import { DataGrid } from "@/components/ui/data-grid";
 import { StatusBadgeRenderer, CurrencyRenderer, DateRenderer } from "@/components/ui/grid-renderers";
@@ -15,7 +15,12 @@ interface Invoice {
   invoiceNumber: string;
   orderId: string;
   status: string;
+  subtotal?: string | null;
+  vatRate?: string | null;
+  vatAmount?: string | null;
   totalAmount: string;
+  amountPaid?: string | null;
+  paymentMethod?: string | null;
   dueDate?: string;
   paidAt?: string;
   createdAt: string;
@@ -63,6 +68,15 @@ export default function InvoicesPage() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Payment recording modal state. When `paymentInvoice` is set, the
+  // modal renders with that invoice preloaded. We track the form
+  // locally so "cancel" doesn't leak into the invoice list rows.
+  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("bank transfer");
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -182,6 +196,76 @@ export default function InvoicesPage() {
     }
   };
 
+  // Open the payment modal preloaded with the outstanding balance.
+  // Defaulting to the remaining amount (not the full total) makes
+  // partial payments obvious -- if a deposit was already recorded,
+  // the florist sees the balance by default.
+  const handleOpenPaymentModal = (invoice: Invoice) => {
+    setPaymentInvoice(invoice);
+    const paid = parseFloat(invoice.amountPaid ?? "0") || 0;
+    const total = parseFloat(invoice.totalAmount) || 0;
+    const remaining = Math.max(0, total - paid);
+    setPaymentAmount(remaining.toFixed(2));
+    setPaymentMethod(invoice.paymentMethod || "bank transfer");
+    setPaymentError(null);
+  };
+
+  const handleClosePaymentModal = () => {
+    setPaymentInvoice(null);
+    setPaymentError(null);
+  };
+
+  const handleSubmitPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!paymentInvoice) return;
+    const amountNum = parseFloat(paymentAmount);
+    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+      setPaymentError("Enter a positive amount");
+      return;
+    }
+
+    try {
+      setPaymentSubmitting(true);
+      setPaymentError(null);
+      // The API computes the cumulative amountPaid for us -- we just
+      // pass the incremental payment and let the server add it to
+      // whatever was already recorded. Actually: the PATCH endpoint
+      // stores the value as-is, so we add client-side here and send
+      // the new running total.
+      const previousPaid = parseFloat(paymentInvoice.amountPaid ?? "0") || 0;
+      const newPaid = previousPaid + amountNum;
+
+      const response = await fetch(
+        `/api/invoices/${paymentInvoice.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amountPaid: newPaid.toFixed(2),
+            paymentMethod,
+          }),
+        }
+      );
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to record payment");
+      }
+      const updated = await response.json();
+      setInvoices((prev) =>
+        prev.map((inv) =>
+          inv.id === updated.id ? { ...inv, ...updated } : inv
+        )
+      );
+      handleClosePaymentModal();
+    } catch (err) {
+      setPaymentError(
+        err instanceof Error ? err.message : "Failed to record payment"
+      );
+    } finally {
+      setPaymentSubmitting(false);
+    }
+  };
+
   const handleDownload = async (id: string) => {
     try {
       setDownloadingId(id);
@@ -257,21 +341,33 @@ export default function InvoicesPage() {
     {
       field: "id",
       headerName: "Actions",
-      width: 100,
+      width: 140,
       sortable: false,
       filter: false,
-      cellRenderer: (params: any) => (
-        <div className="flex items-center justify-center h-full">
-          <button
-            onClick={() => handleDownload(params.value)}
-            disabled={downloadingId === params.value}
-            className="inline-flex items-center justify-center p-2 rounded hover:bg-gray-200 disabled:opacity-50"
-            title="Download PDF"
-          >
-            <Download size={18} />
-          </button>
-        </div>
-      ),
+      cellRenderer: (params: any) => {
+        const invoice = params.data as Invoice;
+        return (
+          <div className="flex items-center justify-center h-full gap-1">
+            <button
+              onClick={() => handleDownload(params.value)}
+              disabled={downloadingId === params.value}
+              className="inline-flex items-center justify-center p-2 rounded hover:bg-gray-200 disabled:opacity-50"
+              title="Download PDF"
+            >
+              <Download size={18} />
+            </button>
+            {invoice.status !== "paid" && (
+              <button
+                onClick={() => handleOpenPaymentModal(invoice)}
+                className="inline-flex items-center justify-center p-2 rounded hover:bg-gray-200"
+                title="Record payment"
+              >
+                <CreditCard size={18} />
+              </button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -434,6 +530,99 @@ export default function InvoicesPage() {
                 {submitting ? "Creating..." : "Create Invoice"}
               </Button>
             </CardFooter>
+          </Card>
+        </div>
+      )}
+
+      {paymentInvoice && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <h2 className="text-xl font-serif font-bold text-gray-900">
+                Record Payment
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                {paymentInvoice.invoiceNumber} ·{" "}
+                {paymentInvoice.order?.enquiry?.clientName || "Unknown"}
+              </p>
+            </CardHeader>
+            <form onSubmit={handleSubmitPayment}>
+              <CardBody className="space-y-4">
+                {paymentError && (
+                  <div className="bg-red-50 border border-red-200 rounded p-3">
+                    <p className="text-red-800 text-sm">{paymentError}</p>
+                  </div>
+                )}
+
+                <div className="text-sm text-gray-700 space-y-1">
+                  <div className="flex justify-between">
+                    <span>Total</span>
+                    <span>£{parseFloat(paymentInvoice.totalAmount).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Already paid</span>
+                    <span>
+                      £
+                      {(parseFloat(paymentInvoice.amountPaid ?? "0") || 0).toFixed(
+                        2
+                      )}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Amount received now
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Enter the amount this payment covers. Partial payments are
+                    supported.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Payment method
+                  </label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1B4332]"
+                  >
+                    <option value="bank transfer">Bank transfer</option>
+                    <option value="card">Card</option>
+                    <option value="cash">Cash</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </CardBody>
+              <CardFooter className="flex gap-3 justify-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleClosePaymentModal}
+                  disabled={paymentSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  disabled={paymentSubmitting}
+                >
+                  {paymentSubmitting ? "Recording..." : "Record Payment"}
+                </Button>
+              </CardFooter>
+            </form>
           </Card>
         </div>
       )}

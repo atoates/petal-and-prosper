@@ -155,8 +155,24 @@ export const invoiceBodySchema = z.object({
   invoiceNumber: z.string().trim().max(100).optional(),
   status: invoiceStatus.default("draft"),
   totalAmount: decimalField,
+  // VAT overrides for this specific invoice. When omitted the handler
+  // pulls the tenant default from invoice_settings.defaultVatRate.
+  vatRate: decimalField,
+  subtotal: decimalField,
   dueDate: isoDateNullable,
   paidAt: isoDateNullable,
+});
+
+// Payment recording + status update endpoint. All fields optional
+// so the caller can update only what changed (e.g. "mark as paid"
+// sends only { status }, "record a deposit" sends { amountPaid,
+// paymentMethod }).
+export const invoicePatchSchema = z.object({
+  status: invoiceStatus.optional(),
+  amountPaid: decimalField,
+  paymentMethod: optionalTrimmed(50),
+  paidAt: isoDateNullable,
+  dueDate: isoDateNullable,
 });
 
 /* ------------------------------ proposals ------------------------------- */
@@ -230,10 +246,26 @@ export const deliveryBodySchema = z.object({
   orderId: requiredTrimmed("Order ID", 100),
   eventDate: isoDateNullable,
   deliveryAddress: optionalTrimmed(500),
+  venueId: optionalTrimmed(100),
+  driverId: optionalTrimmed(100),
+  timeSlot: optionalTrimmed(50),
   // Items is a free-form list stringified into the items JSON column.
   items: z.unknown().optional(),
   notes: optionalTrimmed(2000),
   status: deliveryStatus.default("pending"),
+});
+
+// Patch allows partial updates from the delivery UI -- dispatch
+// confirmation, driver reassignment, status flips, and so on.
+export const deliveryPatchSchema = z.object({
+  eventDate: isoDateNullable,
+  deliveryAddress: optionalTrimmed(500),
+  venueId: optionalTrimmed(100),
+  driverId: optionalTrimmed(100),
+  timeSlot: optionalTrimmed(50),
+  items: z.unknown().optional(),
+  notes: optionalTrimmed(2000),
+  status: deliveryStatus.optional(),
 });
 
 /* ------------------------------ production ------------------------------ */
@@ -244,13 +276,46 @@ export const productionStatus = z.enum([
   "completed",
 ]);
 
+// Individual task row inside a production schedule's task breakdown.
+// Kept loose on purpose so the UI can evolve without schema churn.
+export const productionTaskSchema = z.object({
+  id: z.string().min(1).max(100),
+  label: z.string().trim().min(1).max(500),
+  done: z.boolean().default(false),
+  assignedTo: z.string().max(100).nullable().optional(),
+});
+
 export const productionBodySchema = z.object({
   orderId: requiredTrimmed("Order ID", 100),
   eventDate: isoDateNullable,
   items: z.unknown().optional(),
+  assignedTo: optionalTrimmed(100),
+  tasks: z.array(productionTaskSchema).nullable().optional(),
   notes: optionalTrimmed(2000),
   status: productionStatus.default("not_started"),
 });
+
+// Partial update variant for PATCH /api/production/[id].
+export const productionPatchSchema = z.object({
+  eventDate: isoDateNullable,
+  items: z.unknown().optional(),
+  assignedTo: optionalTrimmed(100),
+  tasks: z.array(productionTaskSchema).nullable().optional(),
+  notes: optionalTrimmed(2000),
+  status: productionStatus.optional(),
+});
+
+/* -------------------------------- venues -------------------------------- */
+
+export const venueBodySchema = z.object({
+  name: requiredTrimmed("Venue name", 200),
+  address: optionalTrimmed(1000),
+  contactName: optionalTrimmed(200),
+  contactPhone: optionalTrimmed(50),
+  notes: optionalTrimmed(2000),
+});
+
+export const venuePatchSchema = venueBodySchema.partial();
 
 /* ------------------------------- wholesale ------------------------------ */
 
@@ -307,6 +372,8 @@ export const invoiceSettingsUpdateSchema = z.object({
   paymentTerms: optionalTrimmed(5000),
   bankDetails: optionalTrimmed(5000),
   notes: optionalTrimmed(5000),
+  defaultVatRate: decimalField,
+  vatNumber: optionalTrimmed(50),
 });
 
 export const settingsBulkUpdateSchema = z.object({

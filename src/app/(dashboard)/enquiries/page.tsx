@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Edit2, Trash2 } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, FilePlus } from "lucide-react";
 import { Can } from "@/components/auth/can";
 import { EnquiryModal } from "@/components/enquiries/enquiry-modal";
 
@@ -22,6 +23,7 @@ interface Enquiry {
 }
 
 export default function EnquiriesPage() {
+  const router = useRouter();
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
   const [filteredEnquiries, setFilteredEnquiries] = useState<Enquiry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,6 +32,7 @@ export default function EnquiriesPage() {
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEnquiry, setSelectedEnquiry] = useState<Enquiry | null>(null);
+  const [creatingOrderFor, setCreatingOrderFor] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchEnquiries = async () => {
@@ -129,6 +132,30 @@ export default function EnquiriesPage() {
     } catch (err) {
       console.error("Error saving enquiry:", err);
       throw err;
+    }
+  };
+
+  // Shortcut: create an empty draft order for this enquiry and jump
+  // straight into its detail page. The POST /api/orders handler also
+  // auto-advances the enquiry's progress to "Order", so the funnel
+  // row flips to the terminal state without an extra round-trip.
+  const handleCreateOrder = async (enquiryId: string) => {
+    try {
+      setCreatingOrderFor(enquiryId);
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enquiryId, status: "draft" }),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to create order");
+      }
+      const created = await response.json();
+      router.push(`/orders/${created.id}`);
+    } catch (err) {
+      console.error("Error creating order from enquiry:", err);
+      alert("Failed to create order for this enquiry");
+      setCreatingOrderFor(null);
     }
   };
 
@@ -287,6 +314,19 @@ export default function EnquiriesPage() {
                         <Badge variant={statusColors[enquiry.progress as keyof typeof statusColors]}>
                           {enquiry.progress}
                         </Badge>
+                        {enquiry.progress !== "Order" && (
+                          <Can permission="orders:create">
+                            <button
+                              type="button"
+                              onClick={() => handleCreateOrder(enquiry.id)}
+                              disabled={creatingOrderFor === enquiry.id}
+                              className="p-1 text-gray-600 hover:text-[#1B4332] hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+                              title="Create order from this enquiry"
+                            >
+                              <FilePlus size={16} />
+                            </button>
+                          </Can>
+                        )}
                         <button
                           onClick={() => handleOpenModal(enquiry)}
                           className="p-1 text-gray-600 hover:text-[#1B4332] hover:bg-gray-100 rounded transition-colors"

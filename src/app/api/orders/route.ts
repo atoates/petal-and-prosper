@@ -71,6 +71,23 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
+    // Auto-advance the parent enquiry's progress to "Order" whenever
+    // an order is created from it. "Order" is the terminal state in
+    // the enquiry funnel, so overwriting unconditionally is correct:
+    // nothing is further along than "an order exists". Tenant
+    // scoping is already guaranteed by the check above.
+    if (data.enquiryId) {
+      await db
+        .update(enquiries)
+        .set({ progress: "Order", updatedAt: new Date() })
+        .where(
+          and(
+            eq(enquiries.id, data.enquiryId),
+            eq(enquiries.companyId, ctx.companyId)
+          )
+        );
+    }
+
     return NextResponse.json(result[0], { status: 201 });
   } catch (error) {
     console.error(

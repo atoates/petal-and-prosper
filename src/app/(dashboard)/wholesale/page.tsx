@@ -38,6 +38,15 @@ interface OrderOption {
   };
 }
 
+interface Product {
+  id: string;
+  name: string;
+  category?: string | null;
+  wholesalePrice?: string | null;
+  unit?: string | null;
+  supplier?: string | null;
+}
+
 interface OrderItemRow {
   id: string;
   description: string;
@@ -56,6 +65,7 @@ export default function WholesalePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [orderOptions, setOrderOptions] = useState<OrderOption[]>([]);
   const [orderOptionsLoading, setOrderOptionsLoading] = useState(false);
+  const [productLibrary, setProductLibrary] = useState<Product[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState("");
   const [supplier, setSupplier] = useState("");
   const [status, setStatus] = useState("pending");
@@ -123,15 +133,46 @@ export default function WholesalePage() {
 
     try {
       setOrderOptionsLoading(true);
-      const response = await fetch("/api/orders");
-      if (!response.ok) throw new Error("Failed to load orders");
-      const data = await response.json();
+      const [ordersRes, productsRes] = await Promise.all([
+        fetch("/api/orders"),
+        fetch("/api/products"),
+      ]);
+      if (!ordersRes.ok) throw new Error("Failed to load orders");
+      const data = await ordersRes.json();
       setOrderOptions(data);
+      // Product library is optional -- if the tenant has no products
+      // yet, or the caller lacks products:read, we just silently skip
+      // the autocomplete rather than blocking the wholesale flow.
+      if (productsRes.ok) {
+        const products = await productsRes.json();
+        setProductLibrary(Array.isArray(products) ? products : []);
+      }
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed to load orders");
     } finally {
       setOrderOptionsLoading(false);
     }
+  };
+
+  // When the user picks a product by typing its name (HTML datalist
+  // selection fires a plain change event), copy its wholesale price
+  // and category onto the row so the florist isn't retyping info that
+  // already lives in the library.
+  const handleDescriptionChange = (index: number, value: string) => {
+    const match = productLibrary.find(
+      (p) => p.name.toLowerCase() === value.toLowerCase()
+    );
+    setLineItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== index) return item;
+        const next: WholesaleLineItem = { ...item, description: value };
+        if (match) {
+          if (match.wholesalePrice) next.unitPrice = match.wholesalePrice;
+          if (match.category) next.category = match.category;
+        }
+        return next;
+      })
+    );
   };
 
   const handleCloseModal = () => {
@@ -345,6 +386,19 @@ export default function WholesalePage() {
               onSubmit={handleSubmit}
               className="flex flex-col flex-1 min-h-0"
             >
+              {/*
+                Shared datalist for all description inputs. A single
+                <datalist> is cheaper than repeating one per row and is
+                addressed by any input via `list="wholesale-product-library"`.
+              */}
+              <datalist id="wholesale-product-library">
+                {productLibrary.map((p) => (
+                  <option key={p.id} value={p.name}>
+                    {p.wholesalePrice ? `£${p.wholesalePrice}` : ""}
+                    {p.supplier ? ` • ${p.supplier}` : ""}
+                  </option>
+                ))}
+              </datalist>
               <CardBody className="space-y-4 overflow-y-auto">
                 {formError && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800">
@@ -435,13 +489,10 @@ export default function WholesalePage() {
                           <input
                             className="col-span-6 px-2 py-1 border border-gray-300 rounded text-sm"
                             placeholder="Description"
+                            list="wholesale-product-library"
                             value={item.description}
                             onChange={(e) =>
-                              handleUpdateLineItem(
-                                index,
-                                "description",
-                                e.target.value
-                              )
+                              handleDescriptionChange(index, e.target.value)
                             }
                           />
                           <input

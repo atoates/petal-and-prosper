@@ -64,6 +64,14 @@ export async function POST(request: NextRequest) {
           data.items === undefined || data.items === null
             ? null
             : JSON.stringify(data.items),
+        assignedTo: data.assignedTo,
+        // Tasks are stored as JSON so the list route returns them
+        // verbatim and the client can parse once. Empty/null becomes
+        // NULL rather than an empty string so legacy readers stay happy.
+        tasks:
+          data.tasks === undefined || data.tasks === null
+            ? null
+            : JSON.stringify(data.tasks),
         notes: data.notes,
         status: data.status,
       })

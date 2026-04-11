@@ -14,7 +14,12 @@ export async function GET(_request: NextRequest) {
     const result = await db.query.deliverySchedules.findMany({
       where: eq(deliverySchedules.companyId, ctx.companyId),
       with: {
-        order: true,
+        order: {
+          with: {
+            enquiry: true,
+          },
+        },
+        venue: true,
       },
       orderBy: desc(deliverySchedules.createdAt),
     });
@@ -61,6 +66,9 @@ export async function POST(request: NextRequest) {
         orderId: data.orderId,
         eventDate: data.eventDate,
         deliveryAddress: data.deliveryAddress,
+        venueId: data.venueId,
+        driverId: data.driverId,
+        timeSlot: data.timeSlot,
         items:
           data.items === undefined || data.items === null
             ? null

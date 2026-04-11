@@ -161,6 +161,9 @@ export async function PUT(request: NextRequest) {
           paymentTerms: invoiceSettingsData.paymentTerms ?? undefined,
           bankDetails: invoiceSettingsData.bankDetails ?? undefined,
           notes: invoiceSettingsData.notes ?? undefined,
+          defaultVatRate:
+            invoiceSettingsData.defaultVatRate ?? undefined,
+          vatNumber: invoiceSettingsData.vatNumber ?? undefined,
           updatedAt: new Date(),
         })
         .where(eq(invoiceSettings.companyId, ctx.companyId));

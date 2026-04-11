@@ -9,15 +9,29 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
 
     try {
-      // Simulated delay -- email integration to be added
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // The endpoint always returns a generic success response to
+      // avoid leaking whether an account exists, so we just treat
+      // any non-ok HTTP status as a submission error.
+      const response = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to send reset link");
+      }
       setSubmitted(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setIsLoading(false);
     }
@@ -34,8 +48,9 @@ export default function ForgotPasswordPage() {
           password reset instructions shortly. Please check your inbox.
         </p>
         <p className="text-amber-600 text-sm mb-4 bg-amber-50 p-3 rounded-lg">
-          Note: Email sending is not yet configured. Please contact your
-          administrator to reset your password manually.
+          Note: email delivery is stubbed in this environment. The reset
+          link is logged to the server console. Your administrator can
+          grab it from there until SMTP is wired in.
         </p>
         <p className="text-gray-600 text-sm mb-6">
           Didn&apos;t receive an email? Check your spam folder or{" "}
@@ -64,6 +79,11 @@ export default function ForgotPasswordPage() {
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-800">
+            {error}
+          </div>
+        )}
         <Input
           type="email"
           label="Email address"

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { invoices, orders, orderItems } from "@/lib/db/schema";
+import {
+  invoices,
+  orders,
+  orderItems,
+  invoiceSettings,
+} from "@/lib/db/schema";
 import { eq, and, desc, like } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
 import { parseJsonBody, invoiceBodySchema } from "@/lib/validators/api";
@@ -94,10 +99,13 @@ export async function POST(request: NextRequest) {
       invoiceNumber = await nextInvoiceNumber(ctx.companyId);
     }
 
-    // Resolve total: use caller's if provided, otherwise pull from order's
-    // line items (or fall back to orders.totalPrice for back-compat).
-    let totalAmount = data.totalAmount;
-    if (!totalAmount) {
+    // Resolve subtotal from the order's line items (or fall back to
+    // orders.totalPrice for back-compat). The subtotal is the pre-VAT
+    // figure; VAT is added on top below. The caller can still override
+    // the final totalAmount after the fact if they want to fudge the
+    // numbers for a manual adjustment.
+    let subtotal = data.subtotal;
+    if (!subtotal) {
       const items = await db
         .select({
           totalPrice: orderItems.totalPrice,
@@ -110,13 +118,34 @@ export async function POST(request: NextRequest) {
         0
       );
       if (itemsTotal > 0) {
-        totalAmount = itemsTotal.toFixed(2);
+        subtotal = itemsTotal.toFixed(2);
       } else if (parentOrder.totalPrice) {
-        totalAmount = parseFloat(parentOrder.totalPrice).toFixed(2);
+        subtotal = parseFloat(parentOrder.totalPrice).toFixed(2);
       } else {
-        totalAmount = "0.00";
+        subtotal = "0.00";
       }
     }
+
+    // Resolve VAT rate: body override beats tenant default. Rate is a
+    // percentage -- "20" means 20 %, not 0.20.
+    let vatRate = data.vatRate;
+    if (vatRate === null || vatRate === undefined) {
+      const settings = await db.query.invoiceSettings.findFirst({
+        where: eq(invoiceSettings.companyId, ctx.companyId),
+        columns: { defaultVatRate: true },
+      });
+      vatRate = settings?.defaultVatRate ?? "0";
+    }
+
+    const subtotalNum = parseFloat(subtotal);
+    const rateNum = parseFloat(vatRate);
+    const vatAmountNum = Number(((subtotalNum * rateNum) / 100).toFixed(2));
+    const computedTotal = Number((subtotalNum + vatAmountNum).toFixed(2));
+
+    // An explicit totalAmount in the body wins (useful for discounts
+    // or manual adjustments), otherwise we use subtotal + VAT.
+    const totalAmount =
+      data.totalAmount ?? computedTotal.toFixed(2);
 
     const result = await db
       .insert(invoices)
@@ -126,6 +155,9 @@ export async function POST(request: NextRequest) {
         orderId: data.orderId,
         invoiceNumber,
         status: data.status,
+        subtotal,
+        vatRate,
+        vatAmount: vatAmountNum.toFixed(2),
         totalAmount,
         dueDate: data.dueDate,
         paidAt: data.paidAt,

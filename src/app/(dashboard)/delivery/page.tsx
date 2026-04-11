@@ -1,21 +1,34 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Plus } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Can } from "@/components/auth/can";
+
+/**
+ * /delivery
+ *
+ * Delivery schedule board. Each row pins an order to a date, a
+ * delivery address (or a saved venue), a driver, and a time slot.
+ * Saved venues let the team reuse frequent locations without
+ * retyping the address; picking one auto-fills the address field
+ * but the field stays editable for one-off tweaks.
+ */
 
 interface DeliverySchedule {
   id: string;
   orderId: string;
-  eventDate?: string;
-  deliveryAddress?: string;
-  items?: string;
-  notes?: string;
+  eventDate?: string | null;
+  deliveryAddress?: string | null;
+  venueId?: string | null;
+  driverId?: string | null;
+  timeSlot?: string | null;
+  items?: string | null;
+  notes?: string | null;
   status: string;
   createdAt: string;
   order?: {
@@ -23,6 +36,7 @@ interface DeliverySchedule {
       clientName: string;
     };
   };
+  venue?: Venue | null;
 }
 
 interface Order {
@@ -32,90 +46,227 @@ interface Order {
   };
 }
 
-interface CreateDeliveryForm {
+interface TeamMember {
+  id: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email: string;
+}
+
+interface Venue {
+  id: string;
+  name: string;
+  address?: string | null;
+  contactName?: string | null;
+  contactPhone?: string | null;
+  notes?: string | null;
+}
+
+interface DeliveryForm {
   orderId: string;
   eventDate: string;
   deliveryAddress: string;
+  venueId: string;
+  driverId: string;
+  timeSlot: string;
   notes: string;
   status: string;
+}
+
+const statusOptions = [
+  { value: "pending", label: "Pending" },
+  { value: "ready", label: "Ready" },
+  { value: "dispatched", label: "Dispatched" },
+  { value: "delivered", label: "Delivered" },
+];
+
+const statusColors: Record<
+  string,
+  "primary" | "success" | "warning" | "danger" | "secondary"
+> = {
+  pending: "warning",
+  ready: "primary",
+  dispatched: "primary",
+  delivered: "success",
+};
+
+function formatDate(dateString?: string | null) {
+  if (!dateString) return "-";
+  return new Date(dateString).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function driverLabel(members: TeamMember[], id?: string | null): string {
+  if (!id) return "Unassigned";
+  const m = members.find((x) => x.id === id);
+  if (!m) return "Unknown";
+  const name = [m.firstName, m.lastName].filter(Boolean).join(" ").trim();
+  return name || m.email;
 }
 
 export default function DeliveryPage() {
   const [schedules, setSchedules] = useState<DeliverySchedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editing, setEditing] = useState<DeliverySchedule | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [team, setTeam] = useState<TeamMember[]>([]);
+  const [venues, setVenues] = useState<Venue[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState<CreateDeliveryForm>({
+
+  // Saved venue book modal -- opened from a small link in the main
+  // delivery modal so venue management happens inline rather than
+  // on a separate page.
+  const [isVenueModalOpen, setIsVenueModalOpen] = useState(false);
+  const [editingVenue, setEditingVenue] = useState<Venue | null>(null);
+  const [venueForm, setVenueForm] = useState({
+    name: "",
+    address: "",
+    contactName: "",
+    contactPhone: "",
+    notes: "",
+  });
+  const [venueSubmitting, setVenueSubmitting] = useState(false);
+  const [venueError, setVenueError] = useState<string | null>(null);
+
+  const [formData, setFormData] = useState<DeliveryForm>({
     orderId: "",
     eventDate: "",
     deliveryAddress: "",
+    venueId: "",
+    driverId: "",
+    timeSlot: "",
     notes: "",
     status: "pending",
   });
 
-  useEffect(() => {
-    const fetchSchedules = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch("/api/delivery");
-        if (!response.ok) {
-          throw new Error("Failed to fetch delivery schedules");
-        }
-        const data = await response.json();
-        setSchedules(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSchedules();
-  }, []);
-
-  const fetchOrders = async () => {
+  const fetchSchedules = useCallback(async () => {
     try {
-      setOrdersLoading(true);
-      const response = await fetch("/api/orders");
+      setLoading(true);
+      const response = await fetch("/api/delivery");
       if (!response.ok) {
-        throw new Error("Failed to fetch orders");
+        throw new Error("Failed to fetch delivery schedules");
       }
       const data = await response.json();
-      setOrders(data);
+      setSchedules(data);
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Failed to load orders");
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
-      setOrdersLoading(false);
+      setLoading(false);
     }
-  };
+  }, []);
 
-  const handleOpenModal = async () => {
-    setIsModalOpen(true);
-    setFormError(null);
+  const fetchVenues = useCallback(async () => {
+    try {
+      const response = await fetch("/api/venues");
+      if (response.ok) {
+        setVenues(await response.json());
+      }
+    } catch (err) {
+      console.error("Error loading venues:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSchedules();
+  }, [fetchSchedules]);
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const load = async () => {
+      try {
+        setOrdersLoading(true);
+        const [ordersRes, usersRes] = await Promise.all([
+          fetch("/api/orders"),
+          fetch("/api/users"),
+          fetchVenues(),
+        ]);
+        if (ordersRes.ok) setOrders(await ordersRes.json());
+        if (usersRes.ok) setTeam(await usersRes.json());
+      } catch (err) {
+        setFormError(
+          err instanceof Error ? err.message : "Failed to load modal data"
+        );
+      } finally {
+        setOrdersLoading(false);
+      }
+    };
+    load();
+  }, [isModalOpen, fetchVenues]);
+
+  const resetForm = () => {
     setFormData({
       orderId: "",
       eventDate: "",
       deliveryAddress: "",
+      venueId: "",
+      driverId: "",
+      timeSlot: "",
       notes: "",
       status: "pending",
     });
-    await fetchOrders();
+    setEditing(null);
+  };
+
+  const handleOpenModal = () => {
+    resetForm();
+    setFormError(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (schedule: DeliverySchedule) => {
+    setEditing(schedule);
+    setFormData({
+      orderId: schedule.orderId,
+      eventDate: schedule.eventDate
+        ? new Date(schedule.eventDate).toISOString().slice(0, 10)
+        : "",
+      deliveryAddress: schedule.deliveryAddress || "",
+      venueId: schedule.venueId || "",
+      driverId: schedule.driverId || "",
+      timeSlot: schedule.timeSlot || "",
+      notes: schedule.notes || "",
+      status: schedule.status,
+    });
+    setFormError(null);
+    setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setFormError(null);
+    resetForm();
   };
 
-  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleFormChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
+  ) => {
     const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // When a saved venue is chosen, auto-fill the address field so
+  // the user doesn't have to copy it by hand. They can still edit
+  // the address after; we never force it to stay in sync.
+  const handleVenueSelect = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const venueId = e.target.value;
+    const venue = venues.find((v) => v.id === venueId);
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      venueId,
+      deliveryAddress:
+        venue && venue.address ? venue.address : prev.deliveryAddress,
     }));
   };
 
@@ -123,38 +274,61 @@ export default function DeliveryPage() {
     e.preventDefault();
     setFormError(null);
 
-    if (!formData.orderId || !formData.eventDate || !formData.deliveryAddress || !formData.status) {
+    if (
+      !formData.orderId ||
+      !formData.eventDate ||
+      !formData.deliveryAddress ||
+      !formData.status
+    ) {
       setFormError("Please fill in all required fields");
       return;
     }
 
     try {
       setIsSubmitting(true);
-      const response = await fetch("/api/delivery", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          orderId: formData.orderId,
-          eventDate: formData.eventDate,
-          deliveryAddress: formData.deliveryAddress,
-          notes: formData.notes,
-          status: formData.status,
-        }),
+
+      const payload = {
+        orderId: formData.orderId,
+        eventDate: formData.eventDate,
+        deliveryAddress: formData.deliveryAddress,
+        venueId: formData.venueId || null,
+        driverId: formData.driverId || null,
+        timeSlot: formData.timeSlot || null,
+        notes: formData.notes || null,
+        status: formData.status,
+      };
+
+      // On edit, strip orderId from the PATCH body (the API doesn't
+      // accept it there) and keep everything else.
+      const url = editing
+        ? `/api/delivery/${editing.id}`
+        : "/api/delivery";
+      const method = editing ? "PATCH" : "POST";
+      const body = editing
+        ? JSON.stringify({
+            eventDate: payload.eventDate,
+            deliveryAddress: payload.deliveryAddress,
+            venueId: payload.venueId,
+            driverId: payload.driverId,
+            timeSlot: payload.timeSlot,
+            notes: payload.notes,
+            status: payload.status,
+          })
+        : JSON.stringify(payload);
+
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body,
       });
 
       if (!response.ok) {
-        throw new Error("Failed to create delivery");
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to save delivery");
       }
 
       handleCloseModal();
-
-      const updatedResponse = await fetch("/api/delivery");
-      if (updatedResponse.ok) {
-        const data = await updatedResponse.json();
-        setSchedules(data);
-      }
+      await fetchSchedules();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -162,56 +336,134 @@ export default function DeliveryPage() {
     }
   };
 
-  const statusColors: Record<string, "primary" | "success" | "warning" | "danger" | "secondary"> = {
-    pending: "warning",
-    scheduled: "primary",
-    in_transit: "primary",
-    delivered: "success",
-    cancelled: "danger",
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  const getItemsSummary = (itemsJson?: string) => {
-    if (!itemsJson) return "-";
+  const handleDelete = async (schedule: DeliverySchedule) => {
+    if (
+      !window.confirm("Delete this delivery schedule? This cannot be undone.")
+    )
+      return;
     try {
-      const items = JSON.parse(itemsJson);
-      if (Array.isArray(items)) {
-        return `${items.length} item${items.length !== 1 ? "s" : ""}`;
-      }
-      return "-";
-    } catch {
-      return "-";
+      const response = await fetch(`/api/delivery/${schedule.id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Failed to delete delivery");
+      setSchedules((prev) => prev.filter((s) => s.id !== schedule.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
     }
   };
 
-  const statusOptions = [
-    { value: "pending", label: "Pending" },
-    { value: "scheduled", label: "Scheduled" },
-    { value: "in_transit", label: "In Transit" },
-    { value: "delivered", label: "Delivered" },
-  ];
+  /* -------- venue book helpers -------- */
+
+  const openVenueModal = (venue: Venue | null = null) => {
+    setEditingVenue(venue);
+    setVenueForm({
+      name: venue?.name || "",
+      address: venue?.address || "",
+      contactName: venue?.contactName || "",
+      contactPhone: venue?.contactPhone || "",
+      notes: venue?.notes || "",
+    });
+    setVenueError(null);
+    setIsVenueModalOpen(true);
+  };
+
+  const closeVenueModal = () => {
+    setIsVenueModalOpen(false);
+    setEditingVenue(null);
+    setVenueError(null);
+  };
+
+  const handleVenueFormChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setVenueForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleVenueSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!venueForm.name.trim()) {
+      setVenueError("Venue name is required");
+      return;
+    }
+    try {
+      setVenueSubmitting(true);
+      setVenueError(null);
+      const url = editingVenue
+        ? `/api/venues/${editingVenue.id}`
+        : "/api/venues";
+      const method = editingVenue ? "PATCH" : "POST";
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: venueForm.name,
+          address: venueForm.address || null,
+          contactName: venueForm.contactName || null,
+          contactPhone: venueForm.contactPhone || null,
+          notes: venueForm.notes || null,
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to save venue");
+      }
+      await fetchVenues();
+      closeVenueModal();
+    } catch (err) {
+      setVenueError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setVenueSubmitting(false);
+    }
+  };
+
+  const handleVenueDelete = async (venue: Venue) => {
+    if (!window.confirm(`Delete venue "${venue.name}"?`)) return;
+    try {
+      const response = await fetch(`/api/venues/${venue.id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Failed to delete venue");
+      await fetchVenues();
+      // If the currently-edited delivery pointed at this venue, clear
+      // the reference so we don't save a dangling FK.
+      setFormData((prev) =>
+        prev.venueId === venue.id ? { ...prev, venueId: "" } : prev
+      );
+    } catch (err) {
+      setVenueError(err instanceof Error ? err.message : "An error occurred");
+    }
+  };
 
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-xl sm:text-3xl font-serif font-bold text-gray-900">Delivery</h1>
+          <h1 className="text-xl sm:text-3xl font-serif font-bold text-gray-900">
+            Delivery
+          </h1>
           <p className="text-gray-600 mt-1">Plan and manage deliveries</p>
         </div>
-        <Can permission="delivery:create">
-          <Button variant="primary" type="button" onClick={handleOpenModal}>
-            <Plus size={20} className="mr-2" />
-            New Delivery
-          </Button>
-        </Can>
+        <div className="flex items-center gap-3">
+          <Can permission="delivery:read">
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={() => {
+                fetchVenues();
+                openVenueModal(null);
+              }}
+            >
+              Manage venues
+            </Button>
+          </Can>
+          <Can permission="delivery:create">
+            <Button variant="primary" type="button" onClick={handleOpenModal}>
+              <Plus size={20} className="mr-2" />
+              New Delivery
+            </Button>
+          </Can>
+        </div>
       </div>
 
       {error && (
@@ -228,14 +480,20 @@ export default function DeliveryPage() {
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#1B4332]"></div>
-                <p className="mt-4 text-gray-600">Loading delivery schedules...</p>
+                <p className="mt-4 text-gray-600">
+                  Loading delivery schedules...
+                </p>
               </div>
             </div>
           ) : schedules.length === 0 ? (
             <CardBody>
               <div className="flex flex-col items-center justify-center py-12">
-                <p className="text-gray-500 text-lg">No deliveries scheduled yet</p>
-                <p className="text-gray-400 mt-1">Create your first delivery to get started</p>
+                <p className="text-gray-500 text-lg">
+                  No deliveries scheduled yet
+                </p>
+                <p className="text-gray-400 mt-1">
+                  Create your first delivery to get started
+                </p>
               </div>
             </CardBody>
           ) : (
@@ -246,16 +504,19 @@ export default function DeliveryPage() {
                     Event Date
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
-                    Address
+                    Time Slot
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                    Venue / Address
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                    Driver
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
                     Status
                   </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
-                    Items
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
-                    Notes
+                  <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -263,31 +524,67 @@ export default function DeliveryPage() {
                 {schedules.map((schedule) => (
                   <tr
                     key={schedule.id}
-                    className="border-b border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
+                    className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
                   >
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {formatDate(schedule.eventDate)}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
-                      {schedule.deliveryAddress || "-"}
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {schedule.timeSlot || "-"}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                      {schedule.venue?.name && (
+                        <div className="font-medium text-gray-900">
+                          {schedule.venue.name}
+                        </div>
+                      )}
+                      <div className="truncate">
+                        {schedule.deliveryAddress || "-"}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {driverLabel(team, schedule.driverId)}
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <Badge
                         variant={
-                          statusColors[schedule.status as keyof typeof statusColors]
+                          statusColors[
+                            schedule.status as keyof typeof statusColors
+                          ]
                         }
                       >
                         {schedule.status
                           .split("_")
-                          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                          .map(
+                            (word) =>
+                              word.charAt(0).toUpperCase() + word.slice(1)
+                          )
                           .join(" ")}
                       </Badge>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {getItemsSummary(schedule.items)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
-                      {schedule.notes || "-"}
+                    <td className="px-6 py-4 text-sm text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Can permission="delivery:update">
+                          <button
+                            type="button"
+                            onClick={() => handleEdit(schedule)}
+                            className="p-2 text-gray-600 hover:text-[#1B4332] hover:bg-gray-100 rounded"
+                            aria-label="Edit delivery"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                        </Can>
+                        <Can permission="delivery:delete">
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(schedule)}
+                            className="p-2 text-gray-600 hover:text-red-700 hover:bg-gray-100 rounded"
+                            aria-label="Delete delivery"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </Can>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -299,9 +596,11 @@ export default function DeliveryPage() {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <CardBody>
-              <h2 className="text-2xl font-serif font-bold text-gray-900 mb-6">Create New Delivery</h2>
+              <h2 className="text-2xl font-serif font-bold text-gray-900 mb-6">
+                {editing ? "Edit Delivery" : "Create New Delivery"}
+              </h2>
 
               {formError && (
                 <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -316,23 +615,66 @@ export default function DeliveryPage() {
                   value={formData.orderId}
                   onChange={handleFormChange}
                   options={[
-                    { value: "", label: ordersLoading ? "Loading orders..." : "Select an order" },
+                    {
+                      value: "",
+                      label: ordersLoading
+                        ? "Loading orders..."
+                        : "Select an order",
+                    },
                     ...orders.map((order) => ({
                       value: order.id,
                       label: `${order.enquiry?.clientName || "Unknown"} (${order.id})`,
                     })),
                   ]}
-                  disabled={ordersLoading}
+                  disabled={ordersLoading || !!editing}
                 />
 
-                <Input
-                  label="Event Date"
-                  type="date"
-                  name="eventDate"
-                  value={formData.eventDate}
-                  onChange={handleFormChange}
-                  required
-                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    label="Event Date"
+                    type="date"
+                    name="eventDate"
+                    value={formData.eventDate}
+                    onChange={handleFormChange}
+                    required
+                  />
+                  <Input
+                    label="Time Slot"
+                    type="text"
+                    name="timeSlot"
+                    value={formData.timeSlot}
+                    onChange={handleFormChange}
+                    placeholder="e.g. 09:00 - 10:30"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Saved venue
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => openVenueModal(null)}
+                      className="text-xs text-[#1B4332] hover:underline"
+                    >
+                      Manage venues
+                    </button>
+                  </div>
+                  <select
+                    name="venueId"
+                    value={formData.venueId}
+                    onChange={handleVenueSelect}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-[#1B4332]"
+                  >
+                    <option value="">None (enter address below)</option>
+                    {venues.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
                 <Input
                   label="Delivery Address"
@@ -342,6 +684,22 @@ export default function DeliveryPage() {
                   onChange={handleFormChange}
                   placeholder="Enter delivery address"
                   required
+                />
+
+                <Select
+                  label="Driver"
+                  name="driverId"
+                  value={formData.driverId}
+                  onChange={handleFormChange}
+                  options={[
+                    { value: "", label: "Unassigned" },
+                    ...team.map((m) => ({
+                      value: m.id,
+                      label:
+                        [m.firstName, m.lastName].filter(Boolean).join(" ") ||
+                        m.email,
+                    })),
+                  ]}
                 />
 
                 <div className="w-full">
@@ -373,7 +731,11 @@ export default function DeliveryPage() {
                     className="flex-1"
                     disabled={isSubmitting}
                   >
-                    {isSubmitting ? "Creating..." : "Create Delivery"}
+                    {isSubmitting
+                      ? "Saving..."
+                      : editing
+                      ? "Save Changes"
+                      : "Create Delivery"}
                   </Button>
                   <Button
                     type="button"
@@ -383,6 +745,149 @@ export default function DeliveryPage() {
                     disabled={isSubmitting}
                   >
                     Cancel
+                  </Button>
+                </div>
+              </form>
+            </CardBody>
+          </Card>
+        </div>
+      )}
+
+      {isVenueModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-xl max-h-[90vh] overflow-y-auto">
+            <CardBody>
+              <h2 className="text-2xl font-serif font-bold text-gray-900 mb-6">
+                {editingVenue ? "Edit Venue" : "Venue Book"}
+              </h2>
+
+              {venueError && (
+                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-800 text-sm">{venueError}</p>
+                </div>
+              )}
+
+              {!editingVenue && venues.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-sm font-medium text-gray-700 mb-2">
+                    Saved venues
+                  </h3>
+                  <div className="border border-gray-200 rounded divide-y divide-gray-200">
+                    {venues.map((v) => (
+                      <div
+                        key={v.id}
+                        className="flex items-center justify-between p-3"
+                      >
+                        <div className="min-w-0 flex-1 pr-4">
+                          <div className="font-medium text-gray-900 truncate">
+                            {v.name}
+                          </div>
+                          {v.address && (
+                            <div className="text-xs text-gray-500 truncate">
+                              {v.address}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openVenueModal(v)}
+                            className="p-2 text-gray-600 hover:text-[#1B4332] hover:bg-gray-100 rounded"
+                            aria-label="Edit venue"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <Can permission="delivery:delete">
+                            <button
+                              type="button"
+                              onClick={() => handleVenueDelete(v)}
+                              className="p-2 text-gray-600 hover:text-red-700 hover:bg-gray-100 rounded"
+                              aria-label="Delete venue"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </Can>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <form onSubmit={handleVenueSubmit} className="space-y-4">
+                <h3 className="text-sm font-medium text-gray-700">
+                  {editingVenue ? "Edit venue details" : "Add a new venue"}
+                </h3>
+                <Input
+                  label="Name"
+                  type="text"
+                  name="name"
+                  value={venueForm.name}
+                  onChange={handleVenueFormChange}
+                  placeholder="e.g. St Andrew's Church"
+                  required
+                />
+                <Input
+                  label="Address"
+                  type="text"
+                  name="address"
+                  value={venueForm.address}
+                  onChange={handleVenueFormChange}
+                  placeholder="Full address"
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    label="Contact name"
+                    type="text"
+                    name="contactName"
+                    value={venueForm.contactName}
+                    onChange={handleVenueFormChange}
+                    placeholder="On-site contact"
+                  />
+                  <Input
+                    label="Contact phone"
+                    type="text"
+                    name="contactPhone"
+                    value={venueForm.contactPhone}
+                    onChange={handleVenueFormChange}
+                    placeholder="Phone number"
+                  />
+                </div>
+                <div className="w-full">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Notes
+                  </label>
+                  <textarea
+                    name="notes"
+                    value={venueForm.notes}
+                    onChange={handleVenueFormChange}
+                    placeholder="Access instructions, parking, etc."
+                    rows={3}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent transition-colors"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    className="flex-1"
+                    disabled={venueSubmitting}
+                  >
+                    {venueSubmitting
+                      ? "Saving..."
+                      : editingVenue
+                      ? "Save Changes"
+                      : "Add Venue"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={closeVenueModal}
+                    disabled={venueSubmitting}
+                  >
+                    Close
                   </Button>
                 </div>
               </form>

@@ -38,6 +38,8 @@ interface InvoiceSettings {
   paymentTerms?: string;
   bankDetails?: string;
   notes?: string;
+  defaultVatRate?: string;
+  vatNumber?: string;
 }
 
 interface Address {
@@ -456,6 +458,51 @@ export default function SettingsPage() {
                       })
                     }
                   />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Default VAT Rate (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      placeholder="e.g. 20"
+                      value={invoiceSettings.defaultVatRate ?? ""}
+                      onChange={(e) =>
+                        setInvoiceSettings({
+                          ...invoiceSettings,
+                          defaultVatRate: e.target.value,
+                        })
+                      }
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Applied to new invoices. Leave at 0 if not
+                      VAT-registered.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      VAT Number
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      placeholder="e.g. GB123456789"
+                      value={invoiceSettings.vatNumber || ""}
+                      onChange={(e) =>
+                        setInvoiceSettings({
+                          ...invoiceSettings,
+                          vatNumber: e.target.value,
+                        })
+                      }
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Shown on invoice PDFs if set.
+                    </p>
+                  </div>
                 </div>
               </CardBody>
               <CardFooter>

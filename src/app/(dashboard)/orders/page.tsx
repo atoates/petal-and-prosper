@@ -18,7 +18,34 @@ interface Order {
   createdAt: string;
   enquiry?: {
     clientName: string;
+    eventDate?: string | null;
+    eventType?: string | null;
   };
+}
+
+// Primary sort for the orders list is the event date on the
+// linked enquiry (ascending, soonest-first), with null event
+// dates bucketed to the end and createdAt (descending) as the
+// tiebreaker. This matches how florists actually work the list:
+// upcoming events first, then anything without a date, then the
+// most recently touched.
+function sortByEventDate(list: Order[]): Order[] {
+  return [...list].sort((a, b) => {
+    const aDate = a.enquiry?.eventDate ?? null;
+    const bDate = b.enquiry?.eventDate ?? null;
+    if (aDate && bDate) {
+      const diff =
+        new Date(aDate).getTime() - new Date(bDate).getTime();
+      if (diff !== 0) return diff;
+    } else if (aDate && !bDate) {
+      return -1;
+    } else if (!aDate && bDate) {
+      return 1;
+    }
+    return (
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  });
 }
 
 export default function OrdersPage() {
@@ -37,7 +64,7 @@ export default function OrdersPage() {
           throw new Error("Failed to fetch orders");
         }
         const data = await response.json();
-        setOrders(data);
+        setOrders(sortByEventDate(data));
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
@@ -109,7 +136,7 @@ export default function OrdersPage() {
 
       const response = await fetch("/api/orders");
       const data = await response.json();
-      setOrders(data);
+      setOrders(sortByEventDate(data));
     } catch (err) {
       console.error("Error saving order:", err);
       throw err;
@@ -132,7 +159,7 @@ export default function OrdersPage() {
 
       const updatedResponse = await fetch("/api/orders");
       const data = await updatedResponse.json();
-      setOrders(data);
+      setOrders(sortByEventDate(data));
     } catch (err) {
       console.error("Error deleting order:", err);
       alert("Failed to delete order");
@@ -186,6 +213,9 @@ export default function OrdersPage() {
                     Client
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                    Event Date
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
                     Status
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
@@ -215,6 +245,11 @@ export default function OrdersPage() {
                       >
                         {order.enquiry?.clientName || "Unknown"}
                       </Link>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {order.enquiry?.eventDate
+                        ? formatDate(order.enquiry.eventDate)
+                        : "-"}
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <Badge variant={statusColors[order.status as keyof typeof statusColors]}>

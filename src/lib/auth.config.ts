@@ -21,6 +21,9 @@ export const authConfigEdge = {
       const publicPaths = ["/", "/login", "/signup", "/forgot-password"];
       const isPublicPath =
         publicPaths.includes(pathname) ||
+        pathname.startsWith("/reset-password/") ||
+        pathname.startsWith("/p/") ||
+        pathname.startsWith("/api/public/") ||
         pathname.startsWith("/api/auth") ||
         pathname.startsWith("/api/auth/");
 

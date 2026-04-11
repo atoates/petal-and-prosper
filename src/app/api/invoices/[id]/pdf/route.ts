@@ -54,10 +54,23 @@ export async function GET(
       where: eq(invoiceSettings.companyId, ctx.companyId),
     });
 
-    // Calculate totals
+    // Prefer persisted invoice figures (set at creation time) over
+    // recomputing from line items -- this keeps historic PDFs stable
+    // if the underlying order items are edited later.
     const items = invoice.order.items || [];
-    const subtotal = items.reduce((sum, item) => sum + parseFloat(item.totalPrice.toString()), 0);
-    const total = subtotal;
+    const computedSubtotal = items.reduce(
+      (sum, item) => sum + parseFloat(item.totalPrice.toString()),
+      0
+    );
+    const subtotal = invoice.subtotal
+      ? parseFloat(invoice.subtotal)
+      : computedSubtotal;
+    const vatRate = invoice.vatRate ? parseFloat(invoice.vatRate) : 0;
+    const vatAmount = invoice.vatAmount ? parseFloat(invoice.vatAmount) : 0;
+    const total = parseFloat(invoice.totalAmount);
+    const amountPaid = invoice.amountPaid
+      ? parseFloat(invoice.amountPaid)
+      : 0;
 
     // Prepare data for PDF generation
     const pdfData = {
@@ -69,6 +82,7 @@ export async function GET(
         contactNo: company.contactNo || undefined,
         website: company.website || undefined,
         logoUrl: company.logoUrl || undefined,
+        vatNumber: settings?.vatNumber || undefined,
       },
       clientName: invoice.order.enquiry?.clientName || "Unknown Client",
       clientEmail: invoice.order.enquiry?.clientEmail || "",
@@ -82,7 +96,11 @@ export async function GET(
         totalPrice: item.totalPrice,
       })),
       subtotal,
+      vatRate,
+      vatAmount,
       total,
+      amountPaid,
+      paymentMethod: invoice.paymentMethod || undefined,
       dueDate: invoice.dueDate || undefined,
       paidDate: invoice.paidAt || undefined,
       status: invoice.status || "pending",
