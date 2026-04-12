@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { X, Trash2, Plus } from "lucide-react";
 import { ProductAutocomplete } from "./product-autocomplete";
 import { useModalA11y } from "@/hooks/use-modal-a11y";
+import { ORDER_STATUSES, type OrderStatus } from "@/types/orders";
 
 interface OrderItem {
   id: string;
@@ -31,7 +32,7 @@ interface PricingRulesShape {
 interface Order {
   id: string;
   enquiryId?: string;
-  status: string;
+  status: OrderStatus;
   version: number;
   totalPrice?: string;
   items?: OrderItem[];
@@ -64,7 +65,10 @@ interface OrderModalProps {
   onSave: (order: Partial<Order>) => Promise<void>;
 }
 
-const STATUS_OPTIONS = ["draft", "quote", "confirmed", "cancelled", "completed"];
+// Sourced from the shared ORDER_STATUSES constant so the modal
+// dropdown, the colour map on the orders list, and the DB enum
+// can't drift from each other again (#17).
+const STATUS_OPTIONS = ORDER_STATUSES;
 const CATEGORY_OPTIONS = [
   "flower",
   "foliage",

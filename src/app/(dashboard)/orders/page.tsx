@@ -9,11 +9,12 @@ import { Plus, Edit2, Trash2, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { OrderModal } from "@/components/orders/order-modal";
 import { Can } from "@/components/auth/can";
+import type { OrderStatus } from "@/types/orders";
 
 interface Order {
   id: string;
   enquiryId?: string;
-  status: string;
+  status: OrderStatus;
   version: number;
   totalPrice?: string;
   createdAt: string;
@@ -76,9 +77,14 @@ export default function OrdersPage() {
     fetchOrders();
   }, []);
 
-  const statusColors: Record<string, "primary" | "success" | "warning" | "danger" | "secondary"> = {
+  // Keyed by the actual `order_status` pgEnum values in schema.ts --
+  // draft, quote, confirmed, cancelled, completed. An earlier version
+  // of this map referenced "pending", which never existed in the
+  // enum, so the branch was dead and `quote` orders rendered with
+  // the default grey. Fixed in #17 of Process-Flow-Review-2026-04-11.md.
+  const statusColors: Record<OrderStatus, "primary" | "success" | "warning" | "danger" | "secondary"> = {
     draft: "secondary",
-    pending: "warning",
+    quote: "warning",
     confirmed: "success",
     completed: "primary",
     cancelled: "danger",
