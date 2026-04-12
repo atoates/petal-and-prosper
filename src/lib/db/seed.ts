@@ -799,10 +799,32 @@ async function seedData(client: any) {
     },
   ];
 
+  // Any enquiry that has a non-cancelled order in the seed MUST be
+  // marked with progress "Order" -- the POST /api/orders handler
+  // auto-advances the enquiry to that state when an order is
+  // created (see audit item #14), so for the seed to reflect the
+  // live API invariant we compute the same advance here. Cancelled
+  // orders don't trigger the bump, so e.g. the West wedding (index
+  // 13) stays at its authored progress.
+  //
+  // These indexes correspond to the orderData entries below:
+  //   0  Sarah Johnson  (confirmed)
+  //   1  Michael Brown  (quote)
+  //   2  Liz Wilson     (completed)
+  //   5  Hayes          (confirmed)
+  //   6  Priya Patel    (completed)
+  //   9  Mitchell       (draft)
+  //   10 Williams       (quote)
+  //   11 Thompson       (draft)
+  //   14 Morris         (quote)
+  const enquiryIndexesWithLiveOrder = new Set([0, 1, 2, 5, 6, 9, 10, 11, 14]);
+
   const enquiryIds = [];
-  for (const enq of enquiriesList) {
+  for (let i = 0; i < enquiriesList.length; i++) {
+    const enq = enquiriesList[i];
     const enquiryId = randomUUID();
     enquiryIds.push(enquiryId);
+    const progress = enquiryIndexesWithLiveOrder.has(i) ? "Order" : enq.progress;
     await client.query(
       `INSERT INTO enquiries (id, company_id, client_name, client_email, client_phone, event_type, event_date, venue_a, progress, notes, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())`,
@@ -815,7 +837,7 @@ async function seedData(client: any) {
         enq.eventType,
         enq.eventDate,
         enq.venueA,
-        enq.progress,
+        progress,
         enq.notes,
       ]
     );
@@ -928,6 +950,21 @@ async function seedData(client: any) {
       ],
     },
   ];
+
+  // Recompute each order's totalPrice as the exact sum of its
+  // normalised line items. Previously the seed hard-coded totalPrice
+  // alongside items and the two drifted -- 7 out of 10 orders had
+  // `orders.total_price` that didn't match `SUM(order_items.total_price)`,
+  // which broke every dashboard widget and invoice that used the
+  // header value. Now the header is derived, so the invariant holds
+  // by construction.
+  for (const od of orderData) {
+    const sum = od.items.reduce(
+      (acc, it) => acc + parseFloat(it.unitPrice) * it.quantity,
+      0
+    );
+    od.totalPrice = sum.toFixed(2);
+  }
 
   const orderIds = [];
   const proposalOrderIds = [];
@@ -1047,12 +1084,20 @@ async function seedData(client: any) {
       status: "dispatched",
     },
     {
+      // orderIds[4] is the Priya Patel anniversary arrangement
+      // (2x "Red Rose and Lily Arrangement" plus 1x centrepiece).
+      // Previously this wholesale row carried only sundries, which
+      // meant the completed order had zero wholesale flower spend
+      // on file. Replaced with red roses and white lilies to match
+      // the actual arrangement brief, with a handful of sundries
+      // retained for mechanics.
       orderId: orderIds[4],
-      supplier: "Smithers Oasis",
+      supplier: "Dutch Flower Group",
       items: [
-        { description: "Oasis Bricks", category: "sundry", quantity: 100, unitPrice: 0.75 },
-        { description: "Stem Tape", category: "sundry", quantity: 50, unitPrice: 1.5 },
-        { description: "Wire 20 Gauge", category: "sundry", quantity: 30, unitPrice: 0.5 },
+        { description: "Red Naomi Roses", category: "flower", quantity: 80, unitPrice: 2.25 },
+        { description: "White Oriental Lilies", category: "flower", quantity: 25, unitPrice: 3.5 },
+        { description: "Eucalyptus Parvifolia", category: "foliage", quantity: 15, unitPrice: 0.8 },
+        { description: "Oasis Bricks", category: "sundry", quantity: 6, unitPrice: 0.75 },
       ],
       status: "pending",
     },
@@ -1226,7 +1271,13 @@ async function seedData(client: any) {
       status: "delivered",
     },
     {
-      orderId: orderIds[5],
+      // Previously this record pointed at orderIds[5] (the Mitchell
+      // baby shower, which is a draft order for a Belgravia private
+      // residence), but the delivery date, address, item list, and
+      // venue contact all describe the Hayes wedding at Tower Bridge
+      // Exhibition Hall (orderIds[3]). Fixed to reference the order
+      // whose content this row actually represents.
+      orderId: orderIds[3],
       deliveryDate: new Date("2026-09-12"),
       deliveryAddress: "Tower Bridge Exhibition Hall, Tower Bridge, London, SE1 2UP",
       items: [
