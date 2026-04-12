@@ -70,12 +70,13 @@ async function createEnums(client: any) {
 }
 
 async function createTables(client: any) {
-  // Drop tables in reverse dependency order
+  // Drop tables in reverse dependency order. Every table that
+  // schema.ts defines must appear here so we get a clean slate.
   const tables = [
     "delivery_schedule_items",
     "production_schedule_items",
     "wholesale_order_items",
-    "product",
+    "products",
     "delivery_schedules",
     "production_schedules",
     "wholesale_orders",
@@ -84,20 +85,30 @@ async function createTables(client: any) {
     "order_items",
     "orders",
     "enquiries",
+    "venues",
     "invoice_settings",
     "proposal_settings",
     "price_settings",
     "subscriptions",
     "addresses",
+    "password_reset_tokens",
     "users",
     "companies",
+    // Legacy table name from before the rename
+    "product",
   ];
 
   for (const table of tables) {
     await client.query(`DROP TABLE IF EXISTS ${table} CASCADE`);
   }
 
-  // Create tables
+  // -----------------------------------------------------------
+  // Create tables -- kept in strict sync with src/lib/db/schema.ts
+  // so that Drizzle queries never reference a column the DB
+  // doesn't have. Every column that schema.ts defines must
+  // appear in the matching CREATE TABLE below.
+  // -----------------------------------------------------------
+
   await client.query(`
     CREATE TABLE companies (
       id TEXT PRIMARY KEY,
@@ -125,6 +136,18 @@ async function createTables(client: any) {
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW(),
       FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL
+    )
+  `);
+
+  await client.query(`
+    CREATE TABLE password_reset_tokens (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      token_hash VARCHAR(128) NOT NULL UNIQUE,
+      expires_at TIMESTAMP NOT NULL,
+      used_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT NOW(),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
   `);
 
@@ -158,6 +181,8 @@ async function createTables(client: any) {
       venue_b VARCHAR(255),
       progress enquiry_progress DEFAULT 'New',
       notes TEXT,
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW(),
       archived_at TIMESTAMP,
@@ -173,6 +198,9 @@ async function createTables(client: any) {
       version INTEGER DEFAULT 1,
       status order_status DEFAULT 'draft',
       total_price DECIMAL(10,2),
+      pricing_snapshot TEXT,
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW(),
       FOREIGN KEY (enquiry_id) REFERENCES enquiries(id) ON DELETE CASCADE,
@@ -189,7 +217,11 @@ async function createTables(client: any) {
       quantity INTEGER NOT NULL,
       unit_price DECIMAL(10,2) NOT NULL,
       total_price DECIMAL(10,2) NOT NULL,
+      base_cost DECIMAL(10,2),
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW(),
       FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
     )
   `);
@@ -201,7 +233,14 @@ async function createTables(client: any) {
       company_id TEXT NOT NULL,
       status proposal_status DEFAULT 'draft',
       sent_at TIMESTAMP,
+      subject TEXT,
+      body_html TEXT,
+      public_token TEXT,
+      accepted_at TIMESTAMP,
+      rejected_at TIMESTAMP,
       content TEXT,
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW(),
       FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
@@ -216,9 +255,16 @@ async function createTables(client: any) {
       company_id TEXT NOT NULL,
       invoice_number VARCHAR(50) NOT NULL UNIQUE,
       status invoice_status DEFAULT 'draft',
+      subtotal DECIMAL(10,2),
+      vat_rate DECIMAL(5,2) DEFAULT 0,
+      vat_amount DECIMAL(10,2) DEFAULT 0,
       total_amount DECIMAL(10,2) NOT NULL,
+      amount_paid DECIMAL(10,2) DEFAULT 0,
+      payment_method VARCHAR(50),
       due_date TIMESTAMP,
       paid_at TIMESTAMP,
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW(),
       FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
@@ -235,6 +281,10 @@ async function createTables(client: any) {
       status wholesale_status DEFAULT 'pending',
       order_date TIMESTAMP DEFAULT NOW(),
       received_date TIMESTAMP,
+      notes TEXT,
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW(),
       FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
@@ -248,11 +298,34 @@ async function createTables(client: any) {
       order_id TEXT NOT NULL,
       company_id TEXT NOT NULL,
       production_date TIMESTAMP,
+      assigned_to TEXT,
+      tasks TEXT,
       notes TEXT,
       status production_status DEFAULT 'not_started',
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW(),
       FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Venues must be created before delivery_schedules because the
+  // latter references venues(id).
+  await client.query(`
+    CREATE TABLE venues (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL,
+      name VARCHAR(200) NOT NULL,
+      address TEXT,
+      contact_name VARCHAR(200),
+      contact_phone VARCHAR(50),
+      notes TEXT,
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW(),
       FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
     )
   `);
@@ -264,8 +337,13 @@ async function createTables(client: any) {
       company_id TEXT NOT NULL,
       delivery_date TIMESTAMP,
       delivery_address TEXT,
+      venue_id TEXT REFERENCES venues(id) ON DELETE SET NULL,
+      driver_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      time_slot VARCHAR(50),
       notes TEXT,
       status delivery_status DEFAULT 'pending',
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW(),
       FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
@@ -309,6 +387,8 @@ async function createTables(client: any) {
       payment_terms TEXT,
       bank_details TEXT,
       notes TEXT,
+      default_vat_rate DECIMAL(5,2) DEFAULT 0,
+      vat_number VARCHAR(50),
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW(),
       FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
@@ -331,7 +411,7 @@ async function createTables(client: any) {
   `);
 
   await client.query(`
-    CREATE TABLE product (
+    CREATE TABLE products (
       id TEXT PRIMARY KEY,
       company_id TEXT NOT NULL,
       name VARCHAR(255) NOT NULL,
@@ -345,7 +425,9 @@ async function createTables(client: any) {
       season VARCHAR(100),
       supplier VARCHAR(255),
       notes TEXT,
-      is_active VARCHAR(5) DEFAULT 'true',
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW(),
       FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
@@ -368,7 +450,7 @@ async function createTables(client: any) {
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW(),
       FOREIGN KEY (wholesale_order_id) REFERENCES wholesale_orders(id) ON DELETE CASCADE,
-      FOREIGN KEY (product_id) REFERENCES product(id) ON DELETE SET NULL
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
     )
   `);
 
@@ -626,8 +708,8 @@ async function seedData(client: any) {
     const id = randomUUID();
     const retailPrice = (parseFloat(String(flower.price)) * 2.5).toFixed(2);
     await client.query(
-      `INSERT INTO product (id, company_id, name, category, subcategory, wholesale_price, retail_price, unit, stem_count, colour, season, supplier, is_active, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'true', NOW(), NOW())`,
+      `INSERT INTO products (id, company_id, name, category, subcategory, wholesale_price, retail_price, unit, stem_count, colour, season, supplier, is_active, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, true, NOW(), NOW())`,
       [
         id,
         COMPANY_ID,
