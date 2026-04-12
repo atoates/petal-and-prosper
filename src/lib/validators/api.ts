@@ -243,6 +243,19 @@ export const deliveryStatus = z.enum([
   "delivered",
 ]);
 
+// Line item schema reused by delivery / production / wholesale.
+// Items are now a proper child table (#16), so the body is typed
+// instead of z.unknown(). orderItemId lets the schedule point back
+// to the source order line the row was populated from (optional --
+// ad-hoc additions are still allowed).
+export const scheduleItemBodySchema = z.object({
+  orderItemId: optionalTrimmed(100),
+  description: requiredTrimmed("Description", 500),
+  category: optionalTrimmed(100),
+  quantity: z.number().int().positive().default(1),
+  notes: optionalTrimmed(2000),
+});
+
 export const deliveryBodySchema = z.object({
   orderId: requiredTrimmed("Order ID", 100),
   deliveryDate: isoDateNullable,
@@ -250,8 +263,7 @@ export const deliveryBodySchema = z.object({
   venueId: optionalTrimmed(100),
   driverId: optionalTrimmed(100),
   timeSlot: optionalTrimmed(50),
-  // Items is a free-form list stringified into the items JSON column.
-  items: z.unknown().optional(),
+  items: z.array(scheduleItemBodySchema).nullable().optional(),
   notes: optionalTrimmed(2000),
   status: deliveryStatus.default("pending"),
 });
@@ -264,7 +276,7 @@ export const deliveryPatchSchema = z.object({
   venueId: optionalTrimmed(100),
   driverId: optionalTrimmed(100),
   timeSlot: optionalTrimmed(50),
-  items: z.unknown().optional(),
+  items: z.array(scheduleItemBodySchema).nullable().optional(),
   notes: optionalTrimmed(2000),
   status: deliveryStatus.optional(),
 });
@@ -292,7 +304,7 @@ export const productionBodySchema = z.object({
   // schedule's production work is being done, not the client event
   // itself. The enquiry row still holds the real event date.
   productionDate: isoDateNullable,
-  items: z.unknown().optional(),
+  items: z.array(scheduleItemBodySchema).nullable().optional(),
   assignedTo: optionalTrimmed(100),
   tasks: z.array(productionTaskSchema).nullable().optional(),
   notes: optionalTrimmed(2000),
@@ -302,7 +314,7 @@ export const productionBodySchema = z.object({
 // Partial update variant for PATCH /api/production/[id].
 export const productionPatchSchema = z.object({
   productionDate: isoDateNullable,
-  items: z.unknown().optional(),
+  items: z.array(scheduleItemBodySchema).nullable().optional(),
   assignedTo: optionalTrimmed(100),
   tasks: z.array(productionTaskSchema).nullable().optional(),
   notes: optionalTrimmed(2000),
@@ -331,10 +343,22 @@ export const wholesaleStatus = z.enum([
   "cancelled",
 ]);
 
+// Wholesale items extend the base schedule item with unit price
+// and a product library pointer, since supplier purchase orders
+// care about cost and want to link to the product record.
+export const wholesaleItemBodySchema = scheduleItemBodySchema.extend({
+  productId: optionalTrimmed(100),
+  unitPrice: z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/, "Must be a decimal with up to 2 places")
+    .nullable()
+    .optional(),
+});
+
 export const wholesaleBodySchema = z.object({
   orderId: requiredTrimmed("Order ID", 100),
   supplier: requiredTrimmed("Supplier", 200),
-  items: z.unknown().optional(),
+  items: z.array(wholesaleItemBodySchema).nullable().optional(),
   status: wholesaleStatus.default("pending"),
   orderDate: isoDateNullable,
   receivedDate: isoDateNullable,

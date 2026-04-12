@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { wholesaleOrders, orders } from "@/lib/db/schema";
+import {
+  wholesaleOrders,
+  wholesaleOrderItems,
+  orders,
+} from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
 import { parseJsonBody, wholesaleBodySchema } from "@/lib/validators/api";
@@ -15,6 +19,7 @@ export async function GET(_request: NextRequest) {
       where: eq(wholesaleOrders.companyId, ctx.companyId),
       with: {
         order: true,
+        items: true,
       },
       orderBy: desc(wholesaleOrders.createdAt),
     });
@@ -53,26 +58,52 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    const result = await db
-      .insert(wholesaleOrders)
-      .values({
-        id: crypto.randomUUID(),
-        companyId: ctx.companyId,
-        orderId: data.orderId,
-        supplier: data.supplier,
-        items:
-          data.items === undefined || data.items === null
-            ? null
-            : JSON.stringify(data.items),
-        status: data.status,
-        orderDate: data.orderDate ?? new Date(),
-        receivedDate: data.receivedDate,
-        createdBy: ctx.userId,
-        updatedBy: ctx.userId,
-      })
-      .returning();
+    // Create the wholesale order and its line items in a single
+    // transaction so a partial insert can't leave a header without
+    // children (or vice versa) -- #16 in Process-Flow-Review.
+    const wholesaleOrderId = crypto.randomUUID();
+    const result = await db.transaction(async (tx) => {
+      const [header] = await tx
+        .insert(wholesaleOrders)
+        .values({
+          id: wholesaleOrderId,
+          companyId: ctx.companyId,
+          orderId: data.orderId,
+          supplier: data.supplier,
+          status: data.status,
+          orderDate: data.orderDate ?? new Date(),
+          receivedDate: data.receivedDate,
+          createdBy: ctx.userId,
+          updatedBy: ctx.userId,
+        })
+        .returning();
 
-    return NextResponse.json(result[0], { status: 201 });
+      if (data.items && data.items.length > 0) {
+        await tx.insert(wholesaleOrderItems).values(
+          data.items.map((item) => ({
+            id: crypto.randomUUID(),
+            wholesaleOrderId,
+            productId: item.productId ?? null,
+            description: item.description,
+            category: item.category ?? null,
+            quantity: item.quantity ?? 1,
+            unitPrice: item.unitPrice ?? null,
+            notes: item.notes ?? null,
+          }))
+        );
+      }
+
+      return header;
+    });
+
+    // Re-read with items so callers get a consistent shape whether
+    // or not the client sent any line items on the POST.
+    const full = await db.query.wholesaleOrders.findFirst({
+      where: eq(wholesaleOrders.id, result.id),
+      with: { items: true },
+    });
+
+    return NextResponse.json(full, { status: 201 });
   } catch (error) {
     console.error(
       "Error creating wholesale order:",

@@ -15,11 +15,19 @@ interface WholesaleLineItem {
   unitPrice?: string;
 }
 
+interface WholesaleOrderItemRow {
+  id: string;
+  description: string;
+  category?: string | null;
+  quantity: number;
+  unitPrice?: string | null;
+}
+
 interface WholesaleOrder {
   id: string;
   orderId: string;
   supplier: string;
-  items?: string;
+  items?: WholesaleOrderItemRow[];
   status: string;
   orderDate: string;
   receivedDate?: string;
@@ -110,17 +118,11 @@ export default function WholesalePage() {
     });
   };
 
-  const getItemsSummary = (itemsJson?: string) => {
-    if (!itemsJson) return "-";
-    try {
-      const items = JSON.parse(itemsJson);
-      if (Array.isArray(items)) {
-        return `${items.length} item${items.length !== 1 ? "s" : ""}`;
-      }
-      return "-";
-    } catch {
-      return "-";
-    }
+  // Items are now a proper child relation (#16), so summarising
+  // is just `items.length` rather than parsing a JSON text column.
+  const getItemsSummary = (items?: WholesaleOrderItemRow[]) => {
+    if (!items || items.length === 0) return "-";
+    return `${items.length} item${items.length !== 1 ? "s" : ""}`;
   };
 
   const handleOpenModal = async () => {

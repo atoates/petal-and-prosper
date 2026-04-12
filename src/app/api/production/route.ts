@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { productionSchedules, orders } from "@/lib/db/schema";
+import {
+  productionSchedules,
+  productionScheduleItems,
+  orders,
+} from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
 import { parseJsonBody, productionBodySchema } from "@/lib/validators/api";
@@ -15,6 +19,7 @@ export async function GET(_request: NextRequest) {
       where: eq(productionSchedules.companyId, ctx.companyId),
       with: {
         order: true,
+        items: true,
       },
       orderBy: desc(productionSchedules.createdAt),
     });
@@ -53,33 +58,54 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    const result = await db
-      .insert(productionSchedules)
-      .values({
-        id: crypto.randomUUID(),
-        companyId: ctx.companyId,
-        orderId: data.orderId,
-        productionDate: data.productionDate,
-        items:
-          data.items === undefined || data.items === null
-            ? null
-            : JSON.stringify(data.items),
-        assignedTo: data.assignedTo,
-        // Tasks are stored as JSON so the list route returns them
-        // verbatim and the client can parse once. Empty/null becomes
-        // NULL rather than an empty string so legacy readers stay happy.
-        tasks:
-          data.tasks === undefined || data.tasks === null
-            ? null
-            : JSON.stringify(data.tasks),
-        notes: data.notes,
-        status: data.status,
-        createdBy: ctx.userId,
-        updatedBy: ctx.userId,
-      })
-      .returning();
+    // Write the header and items atomically so a partial insert
+    // can't leave a schedule without children (#16).
+    const productionScheduleId = crypto.randomUUID();
+    const result = await db.transaction(async (tx) => {
+      const [header] = await tx
+        .insert(productionSchedules)
+        .values({
+          id: productionScheduleId,
+          companyId: ctx.companyId,
+          orderId: data.orderId,
+          productionDate: data.productionDate,
+          assignedTo: data.assignedTo,
+          // Tasks are still stored as JSON (lightweight checklist
+          // with no reporting use case). Items moved to a child table.
+          tasks:
+            data.tasks === undefined || data.tasks === null
+              ? null
+              : JSON.stringify(data.tasks),
+          notes: data.notes,
+          status: data.status,
+          createdBy: ctx.userId,
+          updatedBy: ctx.userId,
+        })
+        .returning();
 
-    return NextResponse.json(result[0], { status: 201 });
+      if (data.items && data.items.length > 0) {
+        await tx.insert(productionScheduleItems).values(
+          data.items.map((item) => ({
+            id: crypto.randomUUID(),
+            productionScheduleId,
+            orderItemId: item.orderItemId ?? null,
+            description: item.description,
+            category: item.category ?? null,
+            quantity: item.quantity ?? 1,
+            notes: item.notes ?? null,
+          }))
+        );
+      }
+
+      return header;
+    });
+
+    const full = await db.query.productionSchedules.findFirst({
+      where: eq(productionSchedules.id, result.id),
+      with: { items: true },
+    });
+
+    return NextResponse.json(full, { status: 201 });
   } catch (error) {
     console.error(
       "Error creating production schedule:",

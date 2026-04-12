@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { productionSchedules } from "@/lib/db/schema";
+import {
+  productionSchedules,
+  productionScheduleItems,
+} from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
 import { parseJsonBody, productionPatchSchema } from "@/lib/validators/api";
@@ -52,25 +55,54 @@ export async function PATCH(
     if (data.notes !== undefined) updates.notes = data.notes;
     if (data.status !== undefined) updates.status = data.status;
     if (data.assignedTo !== undefined) updates.assignedTo = data.assignedTo;
-    if (data.items !== undefined) {
-      updates.items = data.items === null ? null : JSON.stringify(data.items);
-    }
     if (data.tasks !== undefined) {
       updates.tasks = data.tasks === null ? null : JSON.stringify(data.tasks);
     }
 
-    const [updated] = await db
-      .update(productionSchedules)
-      .set(updates)
-      .where(
-        and(
-          eq(productionSchedules.id, params.id),
-          eq(productionSchedules.companyId, ctx.companyId)
+    // Items are now a child table (#16). If the client sends an
+    // items array we do a replace-all inside a transaction so the
+    // header update and the new items land together. Sending
+    // `items: null` or `items: []` clears the list.
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(productionSchedules)
+        .set(updates)
+        .where(
+          and(
+            eq(productionSchedules.id, params.id),
+            eq(productionSchedules.companyId, ctx.companyId)
+          )
         )
-      )
-      .returning();
+        .returning();
 
-    return NextResponse.json(updated);
+      if (data.items !== undefined) {
+        await tx
+          .delete(productionScheduleItems)
+          .where(eq(productionScheduleItems.productionScheduleId, params.id));
+        if (data.items && data.items.length > 0) {
+          await tx.insert(productionScheduleItems).values(
+            data.items.map((item) => ({
+              id: crypto.randomUUID(),
+              productionScheduleId: params.id,
+              orderItemId: item.orderItemId ?? null,
+              description: item.description,
+              category: item.category ?? null,
+              quantity: item.quantity ?? 1,
+              notes: item.notes ?? null,
+            }))
+          );
+        }
+      }
+
+      return row;
+    });
+
+    const full = await db.query.productionSchedules.findFirst({
+      where: eq(productionSchedules.id, params.id),
+      with: { items: true },
+    });
+
+    return NextResponse.json(full ?? updated);
   } catch (error) {
     console.error(
       "Error updating production schedule:",

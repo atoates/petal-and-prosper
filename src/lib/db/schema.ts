@@ -348,7 +348,9 @@ export const wholesaleOrders = pgTable(
       .notNull()
       .references(() => companies.id, { onDelete: "cascade" }),
     supplier: varchar("supplier", { length: 255 }).notNull(),
-    items: text("items"),
+    // Line items live in wholesaleOrderItems (#16). The old
+    // text("items") JSON blob was dropped because it couldn't be
+    // queried, reported on, or joined against the product library.
     status: wholesaleStatusEnum("status").default("pending"),
     orderDate: timestamp("order_date").defaultNow(),
     receivedDate: timestamp("received_date"),
@@ -378,7 +380,9 @@ export const productionSchedules = pgTable(
     // eventDate but that was misleading because the event typically
     // falls after production finishes.
     productionDate: timestamp("production_date"),
-    items: text("items"),
+    // Line items live in productionScheduleItems (#16). The old
+    // text("items") JSON blob was dropped -- see wholesale for the
+    // same rationale.
     // assignedTo stores the user id of the team member leading this
     // production batch. Kept nullable so legacy rows stay valid.
     assignedTo: text("assigned_to"),
@@ -430,7 +434,9 @@ export const deliverySchedules = pgTable(
     // aren't forced into a fixed slot schema. Structured enough for
     // display, flexible enough for real world operations.
     timeSlot: varchar("time_slot", { length: 50 }),
-    items: text("items"),
+    // Line items live in deliveryScheduleItems (#16). The old
+    // text("items") JSON blob was dropped -- see wholesale for the
+    // same rationale.
     notes: text("notes"),
     status: deliveryStatusEnum("status").default("pending"),
     createdBy: text("created_by").references(() => users.id, {
@@ -587,6 +593,85 @@ export const products = pgTable(
   }
 );
 
+/**
+ * Line items for wholesale orders (#16).
+ *
+ * Replaces the old `wholesaleOrders.items` JSON text blob with a
+ * proper child table. This means you can actually report on things
+ * like "how many red roses did I buy last month", join against the
+ * product library, and enforce quantities/prices at the DB layer.
+ *
+ * Cascade on wholesaleOrderId means deleting a wholesale order
+ * cleans up its items. productId is nullable -- historical rows
+ * from before the product library existed, or ad-hoc items that
+ * aren't in the library, don't need to point at a product.
+ */
+export const wholesaleOrderItems = pgTable("wholesale_order_items", {
+  id: text("id").primaryKey(),
+  wholesaleOrderId: text("wholesale_order_id")
+    .notNull()
+    .references(() => wholesaleOrders.id, { onDelete: "cascade" }),
+  productId: text("product_id").references(() => products.id, {
+    onDelete: "set null",
+  }),
+  description: varchar("description", { length: 500 }).notNull(),
+  category: varchar("category", { length: 100 }),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+/**
+ * Line items for production schedules (#16).
+ *
+ * Replaces the old `productionSchedules.items` JSON text blob.
+ * Production items describe what physically has to be built on
+ * the production day (e.g. "bridal bouquet", "aisle arrangement
+ * x4"). orderItemId is an optional pointer back to the source
+ * order_items row so production can auto-populate from the quote.
+ */
+export const productionScheduleItems = pgTable("production_schedule_items", {
+  id: text("id").primaryKey(),
+  productionScheduleId: text("production_schedule_id")
+    .notNull()
+    .references(() => productionSchedules.id, { onDelete: "cascade" }),
+  orderItemId: text("order_item_id").references(() => orderItems.id, {
+    onDelete: "set null",
+  }),
+  description: varchar("description", { length: 500 }).notNull(),
+  category: varchar("category", { length: 100 }),
+  quantity: integer("quantity").notNull().default(1),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+/**
+ * Line items for delivery schedules (#16).
+ *
+ * Replaces the old `deliverySchedules.items` JSON text blob. Each
+ * row is a thing that physically leaves the studio on the delivery
+ * run, with an optional pointer back to the source order_items row
+ * for quick population from the parent quote.
+ */
+export const deliveryScheduleItems = pgTable("delivery_schedule_items", {
+  id: text("id").primaryKey(),
+  deliveryScheduleId: text("delivery_schedule_id")
+    .notNull()
+    .references(() => deliverySchedules.id, { onDelete: "cascade" }),
+  orderItemId: text("order_item_id").references(() => orderItems.id, {
+    onDelete: "set null",
+  }),
+  description: varchar("description", { length: 500 }).notNull(),
+  category: varchar("category", { length: 100 }),
+  quantity: integer("quantity").notNull().default(1),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one }) => ({
   company: one(companies, {
@@ -676,7 +761,7 @@ export const invoicesRelations = relations(invoices, ({ one }) => ({
 
 export const wholesaleOrdersRelations = relations(
   wholesaleOrders,
-  ({ one }) => ({
+  ({ one, many }) => ({
     company: one(companies, {
       fields: [wholesaleOrders.companyId],
       references: [companies.id],
@@ -685,12 +770,27 @@ export const wholesaleOrdersRelations = relations(
       fields: [wholesaleOrders.orderId],
       references: [orders.id],
     }),
+    items: many(wholesaleOrderItems),
+  })
+);
+
+export const wholesaleOrderItemsRelations = relations(
+  wholesaleOrderItems,
+  ({ one }) => ({
+    wholesaleOrder: one(wholesaleOrders, {
+      fields: [wholesaleOrderItems.wholesaleOrderId],
+      references: [wholesaleOrders.id],
+    }),
+    product: one(products, {
+      fields: [wholesaleOrderItems.productId],
+      references: [products.id],
+    }),
   })
 );
 
 export const productionSchedulesRelations = relations(
   productionSchedules,
-  ({ one }) => ({
+  ({ one, many }) => ({
     company: one(companies, {
       fields: [productionSchedules.companyId],
       references: [companies.id],
@@ -699,12 +799,27 @@ export const productionSchedulesRelations = relations(
       fields: [productionSchedules.orderId],
       references: [orders.id],
     }),
+    items: many(productionScheduleItems),
+  })
+);
+
+export const productionScheduleItemsRelations = relations(
+  productionScheduleItems,
+  ({ one }) => ({
+    productionSchedule: one(productionSchedules, {
+      fields: [productionScheduleItems.productionScheduleId],
+      references: [productionSchedules.id],
+    }),
+    orderItem: one(orderItems, {
+      fields: [productionScheduleItems.orderItemId],
+      references: [orderItems.id],
+    }),
   })
 );
 
 export const deliverySchedulesRelations = relations(
   deliverySchedules,
-  ({ one }) => ({
+  ({ one, many }) => ({
     company: one(companies, {
       fields: [deliverySchedules.companyId],
       references: [companies.id],
@@ -716,6 +831,21 @@ export const deliverySchedulesRelations = relations(
     venue: one(venues, {
       fields: [deliverySchedules.venueId],
       references: [venues.id],
+    }),
+    items: many(deliveryScheduleItems),
+  })
+);
+
+export const deliveryScheduleItemsRelations = relations(
+  deliveryScheduleItems,
+  ({ one }) => ({
+    deliverySchedule: one(deliverySchedules, {
+      fields: [deliveryScheduleItems.deliveryScheduleId],
+      references: [deliverySchedules.id],
+    }),
+    orderItem: one(orderItems, {
+      fields: [deliveryScheduleItems.orderItemId],
+      references: [orderItems.id],
     }),
   })
 );

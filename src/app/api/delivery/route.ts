@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { deliverySchedules, orders } from "@/lib/db/schema";
+import {
+  deliverySchedules,
+  deliveryScheduleItems,
+  orders,
+} from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
 import { parseJsonBody, deliveryBodySchema } from "@/lib/validators/api";
@@ -20,6 +24,7 @@ export async function GET(_request: NextRequest) {
           },
         },
         venue: true,
+        items: true,
       },
       orderBy: desc(deliverySchedules.createdAt),
     });
@@ -58,29 +63,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    const result = await db
-      .insert(deliverySchedules)
-      .values({
-        id: crypto.randomUUID(),
-        companyId: ctx.companyId,
-        orderId: data.orderId,
-        deliveryDate: data.deliveryDate,
-        deliveryAddress: data.deliveryAddress,
-        venueId: data.venueId,
-        driverId: data.driverId,
-        timeSlot: data.timeSlot,
-        items:
-          data.items === undefined || data.items === null
-            ? null
-            : JSON.stringify(data.items),
-        notes: data.notes,
-        status: data.status,
-        createdBy: ctx.userId,
-        updatedBy: ctx.userId,
-      })
-      .returning();
+    // Header and items go in together (#16). If nothing is sent for
+    // items the child insert is skipped entirely.
+    const deliveryScheduleId = crypto.randomUUID();
+    const result = await db.transaction(async (tx) => {
+      const [header] = await tx
+        .insert(deliverySchedules)
+        .values({
+          id: deliveryScheduleId,
+          companyId: ctx.companyId,
+          orderId: data.orderId,
+          deliveryDate: data.deliveryDate,
+          deliveryAddress: data.deliveryAddress,
+          venueId: data.venueId,
+          driverId: data.driverId,
+          timeSlot: data.timeSlot,
+          notes: data.notes,
+          status: data.status,
+          createdBy: ctx.userId,
+          updatedBy: ctx.userId,
+        })
+        .returning();
 
-    return NextResponse.json(result[0], { status: 201 });
+      if (data.items && data.items.length > 0) {
+        await tx.insert(deliveryScheduleItems).values(
+          data.items.map((item) => ({
+            id: crypto.randomUUID(),
+            deliveryScheduleId,
+            orderItemId: item.orderItemId ?? null,
+            description: item.description,
+            category: item.category ?? null,
+            quantity: item.quantity ?? 1,
+            notes: item.notes ?? null,
+          }))
+        );
+      }
+
+      return header;
+    });
+
+    const full = await db.query.deliverySchedules.findFirst({
+      where: eq(deliverySchedules.id, result.id),
+      with: { items: true },
+    });
+
+    return NextResponse.json(full, { status: 201 });
   } catch (error) {
     console.error(
       "Error creating delivery schedule:",

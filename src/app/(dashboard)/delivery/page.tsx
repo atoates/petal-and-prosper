@@ -19,6 +19,14 @@ import { Can } from "@/components/auth/can";
  * but the field stays editable for one-off tweaks.
  */
 
+interface DeliveryScheduleItem {
+  id: string;
+  description: string;
+  category?: string | null;
+  quantity: number;
+  notes?: string | null;
+}
+
 interface DeliverySchedule {
   id: string;
   orderId: string;
@@ -27,7 +35,9 @@ interface DeliverySchedule {
   venueId?: string | null;
   driverId?: string | null;
   timeSlot?: string | null;
-  items?: string | null;
+  // Items are now a proper child relation (#16) rather than a
+  // JSON-encoded text column.
+  items?: DeliveryScheduleItem[];
   notes?: string | null;
   status: string;
   createdAt: string;

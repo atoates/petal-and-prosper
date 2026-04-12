@@ -24,11 +24,21 @@ interface ProductionTask {
   assignedTo?: string | null;
 }
 
+interface ProductionScheduleItem {
+  id: string;
+  description: string;
+  category?: string | null;
+  quantity: number;
+  notes?: string | null;
+}
+
 interface ProductionSchedule {
   id: string;
   orderId: string;
   productionDate?: string | null;
-  items?: string | null;
+  // Items are now a proper child relation (#16) rather than a
+  // JSON-encoded text column.
+  items?: ProductionScheduleItem[];
   assignedTo?: string | null;
   tasks?: string | null;
   notes?: string | null;

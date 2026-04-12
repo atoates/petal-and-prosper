@@ -72,6 +72,9 @@ async function createEnums(client: any) {
 async function createTables(client: any) {
   // Drop tables in reverse dependency order
   const tables = [
+    "delivery_schedule_items",
+    "production_schedule_items",
+    "wholesale_order_items",
     "product",
     "delivery_schedules",
     "production_schedules",
@@ -229,7 +232,6 @@ async function createTables(client: any) {
       order_id TEXT NOT NULL,
       company_id TEXT NOT NULL,
       supplier VARCHAR(255) NOT NULL,
-      items TEXT,
       status wholesale_status DEFAULT 'pending',
       order_date TIMESTAMP DEFAULT NOW(),
       received_date TIMESTAMP,
@@ -246,7 +248,6 @@ async function createTables(client: any) {
       order_id TEXT NOT NULL,
       company_id TEXT NOT NULL,
       production_date TIMESTAMP,
-      items TEXT,
       notes TEXT,
       status production_status DEFAULT 'not_started',
       created_at TIMESTAMP DEFAULT NOW(),
@@ -263,7 +264,6 @@ async function createTables(client: any) {
       company_id TEXT NOT NULL,
       delivery_date TIMESTAMP,
       delivery_address TEXT,
-      items TEXT,
       notes TEXT,
       status delivery_status DEFAULT 'pending',
       created_at TIMESTAMP DEFAULT NOW(),
@@ -349,6 +349,58 @@ async function createTables(client: any) {
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW(),
       FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Schedule line-item child tables (#16). These replace the old
+  // text("items") JSON columns on wholesale_orders, production_schedules,
+  // and delivery_schedules with queryable, joinable rows.
+  await client.query(`
+    CREATE TABLE wholesale_order_items (
+      id TEXT PRIMARY KEY,
+      wholesale_order_id TEXT NOT NULL,
+      product_id TEXT,
+      description VARCHAR(500) NOT NULL,
+      category VARCHAR(100),
+      quantity INTEGER NOT NULL DEFAULT 1,
+      unit_price DECIMAL(10,2),
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW(),
+      FOREIGN KEY (wholesale_order_id) REFERENCES wholesale_orders(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES product(id) ON DELETE SET NULL
+    )
+  `);
+
+  await client.query(`
+    CREATE TABLE production_schedule_items (
+      id TEXT PRIMARY KEY,
+      production_schedule_id TEXT NOT NULL,
+      order_item_id TEXT,
+      description VARCHAR(500) NOT NULL,
+      category VARCHAR(100),
+      quantity INTEGER NOT NULL DEFAULT 1,
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW(),
+      FOREIGN KEY (production_schedule_id) REFERENCES production_schedules(id) ON DELETE CASCADE,
+      FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE SET NULL
+    )
+  `);
+
+  await client.query(`
+    CREATE TABLE delivery_schedule_items (
+      id TEXT PRIMARY KEY,
+      delivery_schedule_id TEXT NOT NULL,
+      order_item_id TEXT,
+      description VARCHAR(500) NOT NULL,
+      category VARCHAR(100),
+      quantity INTEGER NOT NULL DEFAULT 1,
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW(),
+      FOREIGN KEY (delivery_schedule_id) REFERENCES delivery_schedules(id) ON DELETE CASCADE,
+      FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE SET NULL
     )
   `);
 }
@@ -959,47 +1011,49 @@ async function seedData(client: any) {
     );
   }
 
-  // Seed wholesale orders (4 wholesale orders)
+  // Seed wholesale orders (4 wholesale orders). Items are normalised
+  // into `wholesale_order_items` (see #16 in
+  // Process-Flow-Review-2026-04-11.md), with one child row per line.
   const wholesaleData = [
     {
       orderId: orderIds[0],
       supplier: "Dutch Flower Group",
-      items: JSON.stringify([
-        { item: "David Austin Roses - Juliet", quantity: 50, unitPrice: 4.50 },
-        { item: "White Hydrangeas", quantity: 30, unitPrice: 1.80 },
-        { item: "Eucalyptus Seeded", quantity: 20, unitPrice: 0.75 },
-      ]),
+      items: [
+        { description: "David Austin Roses - Juliet", category: "flower", quantity: 50, unitPrice: 4.5 },
+        { description: "White Hydrangeas", category: "flower", quantity: 30, unitPrice: 1.8 },
+        { description: "Eucalyptus Seeded", category: "foliage", quantity: 20, unitPrice: 0.75 },
+      ],
       status: "confirmed",
     },
     {
       orderId: orderIds[1],
       supplier: "Triangle Nursery",
-      items: JSON.stringify([
-        { item: "Mixed Roses", quantity: 200, unitPrice: 2.00 },
-        { item: "Ruscus Italian", quantity: 100, unitPrice: 0.50 },
-        { item: "Gypsophila White", quantity: 80, unitPrice: 0.60 },
-      ]),
+      items: [
+        { description: "Mixed Roses", category: "flower", quantity: 200, unitPrice: 2.0 },
+        { description: "Ruscus Italian", category: "foliage", quantity: 100, unitPrice: 0.5 },
+        { description: "Gypsophila White", category: "flower", quantity: 80, unitPrice: 0.6 },
+      ],
       status: "received",
     },
     {
       orderId: orderIds[3],
       supplier: "Zest Flowers",
-      items: JSON.stringify([
-        { item: "Peonies Mix", quantity: 40, unitPrice: 5.50 },
-        { item: "Lisianthus White", quantity: 60, unitPrice: 1.50 },
-        { item: "Waxflower Pink", quantity: 50, unitPrice: 1.20 },
-        { item: "Asparagus Fern", quantity: 30, unitPrice: 0.65 },
-      ]),
+      items: [
+        { description: "Peonies Mix", category: "flower", quantity: 40, unitPrice: 5.5 },
+        { description: "Lisianthus White", category: "flower", quantity: 60, unitPrice: 1.5 },
+        { description: "Waxflower Pink", category: "flower", quantity: 50, unitPrice: 1.2 },
+        { description: "Asparagus Fern", category: "foliage", quantity: 30, unitPrice: 0.65 },
+      ],
       status: "dispatched",
     },
     {
       orderId: orderIds[4],
       supplier: "Smithers Oasis",
-      items: JSON.stringify([
-        { item: "Oasis Bricks", quantity: 100, unitPrice: 0.75 },
-        { item: "Stem Tape", quantity: 50, unitPrice: 1.50 },
-        { item: "Wire 20 Gauge", quantity: 30, unitPrice: 0.50 },
-      ]),
+      items: [
+        { description: "Oasis Bricks", category: "sundry", quantity: 100, unitPrice: 0.75 },
+        { description: "Stem Tape", category: "sundry", quantity: 50, unitPrice: 1.5 },
+        { description: "Wire 20 Gauge", category: "sundry", quantity: 30, unitPrice: 0.5 },
+      ],
       status: "pending",
     },
   ];
@@ -1008,75 +1062,92 @@ async function seedData(client: any) {
     const wholesaleId = randomUUID();
     const receivedDate = wo.status === "received" ? new Date() : null;
     await client.query(
-      `INSERT INTO wholesale_orders (id, order_id, company_id, supplier, items, status, received_date, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
+      `INSERT INTO wholesale_orders (id, order_id, company_id, supplier, status, received_date, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
       [
         wholesaleId,
         wo.orderId,
         COMPANY_ID,
         wo.supplier,
-        wo.items,
         wo.status,
         receivedDate,
       ]
     );
+
+    for (const item of wo.items) {
+      await client.query(
+        `INSERT INTO wholesale_order_items (id, wholesale_order_id, description, category, quantity, unit_price, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
+        [
+          randomUUID(),
+          wholesaleId,
+          item.description,
+          item.category,
+          item.quantity,
+          item.unitPrice,
+        ]
+      );
+    }
   }
 
   // Seed production schedules (5 production schedules). These dates
   // describe when the production work itself is planned, not the
   // client event, hence `productionDate` rather than `eventDate`.
+  // Items are now normalised into `production_schedule_items` (see
+  // #16 in Process-Flow-Review-2026-04-11.md), so each production
+  // schedule owns a set of child rows keyed by its id.
   const productionData = [
     {
       orderId: orderIds[0],
       productionDate: new Date("2026-06-14"),
-      items: JSON.stringify([
-        { item: "Bridal Bouquet", status: "in_progress" },
-        { item: "Bridesmaids Bouquets", status: "in_progress" },
-        { item: "Table Centrepieces", status: "not_started" },
-      ]),
+      items: [
+        { description: "Bridal Bouquet", category: "arrangement", quantity: 1 },
+        { description: "Bridesmaids Bouquets", category: "arrangement", quantity: 4 },
+        { description: "Table Centrepieces", category: "arrangement", quantity: 20 },
+      ],
       notes: "Start early on bridesmaids to ensure consistency. Event is Saturday.",
       status: "in_progress",
     },
     {
       orderId: orderIds[1],
       productionDate: new Date("2026-04-09"),
-      items: JSON.stringify([
-        { item: "Reception Arrangement", status: "completed" },
-        { item: "50 Table Centrepieces", status: "in_progress" },
-      ]),
+      items: [
+        { description: "Reception Arrangement", category: "arrangement", quantity: 1 },
+        { description: "Table Centrepieces", category: "arrangement", quantity: 50 },
+      ],
       notes: "Corporate event. Minimalist style, focus on clean lines.",
       status: "in_progress",
     },
     {
       orderId: orderIds[3],
       productionDate: new Date("2026-09-11"),
-      items: JSON.stringify([
-        { item: "Bridal Bouquet", status: "not_started" },
-        { item: "6 Bridesmaids Bouquets", status: "not_started" },
-        { item: "30 Table Centrepieces", status: "not_started" },
-        { item: "Pedestals and Top Table", status: "not_started" },
-      ]),
+      items: [
+        { description: "Bridal Bouquet", category: "arrangement", quantity: 1 },
+        { description: "Bridesmaids Bouquets", category: "arrangement", quantity: 6 },
+        { description: "Table Centrepieces", category: "arrangement", quantity: 30 },
+        { description: "Pedestals and Top Table", category: "arrangement", quantity: 1 },
+      ],
       notes: "Large summer wedding. Schedule production carefully to maintain freshness.",
       status: "not_started",
     },
     {
       orderId: orderIds[5],
       productionDate: new Date("2026-05-09"),
-      items: JSON.stringify([
-        { item: "Baby Shower Arrangement", status: "completed" },
-        { item: "Small Posies", status: "completed" },
-      ]),
+      items: [
+        { description: "Baby Shower Arrangement", category: "arrangement", quantity: 1 },
+        { description: "Small Posies", category: "arrangement", quantity: 6 },
+      ],
       notes: "Pastel colours completed successfully.",
       status: "completed",
     },
     {
       orderId: orderIds[7],
       productionDate: new Date("2026-11-21"),
-      items: JSON.stringify([
-        { item: "Bridal Bouquet - Formal White", status: "not_started" },
-        { item: "7 Bridesmaids Bouquets", status: "not_started" },
-        { item: "45 Table Centrepieces", status: "not_started" },
-      ]),
+      items: [
+        { description: "Bridal Bouquet - Formal White", category: "arrangement", quantity: 1 },
+        { description: "Bridesmaids Bouquets", category: "arrangement", quantity: 7 },
+        { description: "Table Centrepieces", category: "arrangement", quantity: 45 },
+      ],
       notes: "Formal winter wedding. Traditional style. Order well in advance for holiday season.",
       status: "not_started",
     },
@@ -1085,33 +1156,50 @@ async function seedData(client: any) {
   for (const pd of productionData) {
     const productionId = randomUUID();
     await client.query(
-      `INSERT INTO production_schedules (id, order_id, company_id, production_date, items, notes, status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
+      `INSERT INTO production_schedules (id, order_id, company_id, production_date, notes, status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
       [
         productionId,
         pd.orderId,
         COMPANY_ID,
         pd.productionDate,
-        pd.items,
         pd.notes,
         pd.status,
       ]
     );
+
+    for (const item of pd.items) {
+      await client.query(
+        `INSERT INTO production_schedule_items (id, production_schedule_id, description, category, quantity, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+        [
+          randomUUID(),
+          productionId,
+          item.description,
+          item.category,
+          item.quantity,
+        ]
+      );
+    }
   }
 
   // Seed delivery schedules (5 delivery schedules). `deliveryDate`
   // is the date the flowers are being dropped off at the venue,
   // which may or may not match the event start on the enquiry.
+  // Items are normalised into `delivery_schedule_items` (see #16 in
+  // Process-Flow-Review-2026-04-11.md). Per-item delivered booleans
+  // from the old JSON shape are dropped -- the schedule-level
+  // `status` column already captures whether the drop-off happened.
   const deliveryData = [
     {
       orderId: orderIds[0],
       deliveryDate: new Date("2026-06-15"),
       deliveryAddress: "Chelsea Town Hall, King's Road, London, SW3 5EE",
-      items: JSON.stringify([
-        { item: "Bridal Bouquet", delivered: false },
-        { item: "4 Bridesmaids Bouquets", delivered: false },
-        { item: "20 Table Centrepieces", delivered: false },
-      ]),
+      items: [
+        { description: "Bridal Bouquet", category: "arrangement", quantity: 1 },
+        { description: "Bridesmaids Bouquets", category: "arrangement", quantity: 4 },
+        { description: "Table Centrepieces", category: "arrangement", quantity: 20 },
+      ],
       notes: "Early morning delivery. Coordinate with venue manager. Contact: Sarah Johnson 020 7946 0958",
       status: "ready",
     },
@@ -1119,10 +1207,10 @@ async function seedData(client: any) {
       orderId: orderIds[1],
       deliveryDate: new Date("2026-04-10"),
       deliveryAddress: "Canary Wharf Conference Centre, 40 Bank Street, London, E14 5ER",
-      items: JSON.stringify([
-        { item: "Reception Arrangement", delivered: false },
-        { item: "50 Table Centrepieces", delivered: false },
-      ]),
+      items: [
+        { description: "Reception Arrangement", category: "arrangement", quantity: 1 },
+        { description: "Table Centrepieces", category: "arrangement", quantity: 50 },
+      ],
       notes: "Delivery by 8 AM for morning event setup. Building security code required.",
       status: "pending",
     },
@@ -1130,10 +1218,10 @@ async function seedData(client: any) {
       orderId: orderIds[2],
       deliveryDate: new Date("2026-04-05"),
       deliveryAddress: "St Mary Church, Kensington Church Street, London, W8 4LA",
-      items: JSON.stringify([
-        { item: "2 Funeral Wreaths", delivered: true },
-        { item: "Casket Spray", delivered: true },
-      ]),
+      items: [
+        { description: "Funeral Wreaths", category: "arrangement", quantity: 2 },
+        { description: "Casket Spray", category: "arrangement", quantity: 1 },
+      ],
       notes: "Delivery completed. Service took place as scheduled.",
       status: "delivered",
     },
@@ -1141,11 +1229,11 @@ async function seedData(client: any) {
       orderId: orderIds[5],
       deliveryDate: new Date("2026-09-12"),
       deliveryAddress: "Tower Bridge Exhibition Hall, Tower Bridge, London, SE1 2UP",
-      items: JSON.stringify([
-        { item: "Bridal Bouquet", delivered: false },
-        { item: "6 Bridesmaids Bouquets", delivered: false },
-        { item: "30 Table Centrepieces", delivered: false },
-      ]),
+      items: [
+        { description: "Bridal Bouquet", category: "arrangement", quantity: 1 },
+        { description: "Bridesmaids Bouquets", category: "arrangement", quantity: 6 },
+        { description: "Table Centrepieces", category: "arrangement", quantity: 30 },
+      ],
       notes: "Large wedding. Multiple deliveries may be required. Venue contact: Rebecca Hayes 020 7654 3210",
       status: "dispatched",
     },
@@ -1153,10 +1241,10 @@ async function seedData(client: any) {
       orderId: orderIds[9],
       deliveryDate: new Date("2026-07-02"),
       deliveryAddress: "Alexandra Palace, Alexandra Palace Way, London, N22 7AY",
-      items: JSON.stringify([
-        { item: "Prom Entrance Flowers", delivered: false },
-        { item: "Stage Arrangements", delivered: false },
-      ]),
+      items: [
+        { description: "Prom Entrance Flowers", category: "arrangement", quantity: 1 },
+        { description: "Stage Arrangements", category: "arrangement", quantity: 2 },
+      ],
       notes: "School prom event. Early afternoon delivery. Large event with many guests.",
       status: "pending",
     },
@@ -1165,19 +1253,32 @@ async function seedData(client: any) {
   for (const dd of deliveryData) {
     const deliveryId = randomUUID();
     await client.query(
-      `INSERT INTO delivery_schedules (id, order_id, company_id, delivery_date, delivery_address, items, notes, status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`,
+      `INSERT INTO delivery_schedules (id, order_id, company_id, delivery_date, delivery_address, notes, status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
       [
         deliveryId,
         dd.orderId,
         COMPANY_ID,
         dd.deliveryDate,
         dd.deliveryAddress,
-        dd.items,
         dd.notes,
         dd.status,
       ]
     );
+
+    for (const item of dd.items) {
+      await client.query(
+        `INSERT INTO delivery_schedule_items (id, delivery_schedule_id, description, category, quantity, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+        [
+          randomUUID(),
+          deliveryId,
+          item.description,
+          item.category,
+          item.quantity,
+        ]
+      );
+    }
   }
 }
 

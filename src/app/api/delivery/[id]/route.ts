@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { deliverySchedules } from "@/lib/db/schema";
+import {
+  deliverySchedules,
+  deliveryScheduleItems,
+} from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
 import { parseJsonBody, deliveryPatchSchema } from "@/lib/validators/api";
@@ -55,22 +58,51 @@ export async function PATCH(
     if (data.timeSlot !== undefined) updates.timeSlot = data.timeSlot;
     if (data.notes !== undefined) updates.notes = data.notes;
     if (data.status !== undefined) updates.status = data.status;
-    if (data.items !== undefined) {
-      updates.items = data.items === null ? null : JSON.stringify(data.items);
-    }
 
-    const [updated] = await db
-      .update(deliverySchedules)
-      .set(updates)
-      .where(
-        and(
-          eq(deliverySchedules.id, params.id),
-          eq(deliverySchedules.companyId, ctx.companyId)
+    // Items are now a child table (#16). If the client sends items
+    // we do a replace-all inside a transaction so the header update
+    // and the new rows land together. `items: null` or `[]` clears
+    // the existing list.
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(deliverySchedules)
+        .set(updates)
+        .where(
+          and(
+            eq(deliverySchedules.id, params.id),
+            eq(deliverySchedules.companyId, ctx.companyId)
+          )
         )
-      )
-      .returning();
+        .returning();
 
-    return NextResponse.json(updated);
+      if (data.items !== undefined) {
+        await tx
+          .delete(deliveryScheduleItems)
+          .where(eq(deliveryScheduleItems.deliveryScheduleId, params.id));
+        if (data.items && data.items.length > 0) {
+          await tx.insert(deliveryScheduleItems).values(
+            data.items.map((item) => ({
+              id: crypto.randomUUID(),
+              deliveryScheduleId: params.id,
+              orderItemId: item.orderItemId ?? null,
+              description: item.description,
+              category: item.category ?? null,
+              quantity: item.quantity ?? 1,
+              notes: item.notes ?? null,
+            }))
+          );
+        }
+      }
+
+      return row;
+    });
+
+    const full = await db.query.deliverySchedules.findFirst({
+      where: eq(deliverySchedules.id, params.id),
+      with: { items: true },
+    });
+
+    return NextResponse.json(full ?? updated);
   } catch (error) {
     console.error(
       "Error updating delivery schedule:",
