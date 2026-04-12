@@ -411,6 +411,27 @@ export const settingsBulkUpdateSchema = z.object({
   invoiceSettings: invoiceSettingsUpdateSchema.optional(),
 });
 
+/* ------------------------------ addresses ------------------------------- */
+
+// Matches the address_type pgEnum in schema.ts. Keep these in sync.
+export const addressType = z.enum(["billing", "delivery", "studio"]);
+
+// POST /api/settings/addresses (create) and PUT
+// /api/settings/addresses/:id (update) share this shape. `street`,
+// `city` and `postcode` are NOT NULL in the schema so they are
+// required here too; `type` is required because the enum has no
+// sensible default for a company.
+export const addressBodySchema = z.object({
+  type: addressType,
+  buildingName: optionalTrimmed(255),
+  street: requiredTrimmed("Street", 255),
+  town: optionalTrimmed(100),
+  city: requiredTrimmed("City", 100),
+  postcode: requiredTrimmed("Postcode", 20),
+  country: optionalTrimmed(100),
+});
+export type AddressBody = z.infer<typeof addressBodySchema>;
+
 /* --------------------- small parsing helper ----------------------------- */
 
 export type ParsedBody<T> =
