@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { ChevronRight, ChevronLeft, Package, Search } from "lucide-react";
 
 export interface Product {
@@ -46,6 +46,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   container: "Containers",
   ribbon: "Ribbons",
   accessory: "Accessories",
+  _bundles: "Bundles",
 };
 
 const CATEGORY_ORDER = [
@@ -74,6 +75,11 @@ export function ProductAutocomplete({
   const listRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Keep the search input focused whenever the dropdown is open
+  const focusSearch = useCallback(() => {
+    requestAnimationFrame(() => searchInputRef.current?.focus());
+  }, []);
+
   // Build the category list with counts
   const categories = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -81,15 +87,29 @@ export function ProductAutocomplete({
       const cat = p.category?.toLowerCase() || "other";
       counts[cat] = (counts[cat] || 0) + 1;
     }
-    return CATEGORY_ORDER.filter((c) => counts[c]).map((c) => ({
+    const cats = CATEGORY_ORDER.filter((c) => counts[c]).map((c) => ({
       key: c,
       label: CATEGORY_LABELS[c] || c,
       count: counts[c],
     }));
-  }, [products]);
+
+    // Add Bundles as a top-level category if any exist
+    if (bundles.length > 0) {
+      cats.push({
+        key: "_bundles",
+        label: "Bundles",
+        count: bundles.length,
+      });
+    }
+
+    return cats;
+  }, [products, bundles]);
 
   // Filter products based on search term and active category
   const filteredProducts = useMemo(() => {
+    // When browsing bundles, no products shown
+    if (activeCategory === "_bundles") return [];
+
     let list = products;
 
     if (activeCategory) {
@@ -113,7 +133,8 @@ export function ProductAutocomplete({
 
   // Filter bundles by search term
   const filteredBundles = useMemo(() => {
-    if (activeCategory) return [];
+    // Show bundles when browsing the _bundles category, or when searching globally
+    if (activeCategory && activeCategory !== "_bundles") return [];
     const term = searchTerm.trim().toLowerCase();
     if (term.length === 0) return bundles;
     return bundles.filter(
@@ -131,18 +152,23 @@ export function ProductAutocomplete({
       | { type: "product"; product: Product }
     > = [];
 
-    // When no category is active, show categories first, then bundles
+    // When no category is active and not searching, show category list
     if (!activeCategory && searchTerm.trim().length === 0) {
       for (const cat of categories) {
         items.push({ type: "category", ...cat });
       }
+    } else if (activeCategory === "_bundles") {
+      // Browsing bundles category
       for (const b of filteredBundles) {
         items.push({ type: "bundle", bundle: b });
       }
     } else {
-      // When searching or inside a category, show bundles then products
-      for (const b of filteredBundles) {
-        items.push({ type: "bundle", bundle: b });
+      // Searching or inside a product category
+      // Show matching bundles first when searching globally
+      if (!activeCategory) {
+        for (const b of filteredBundles) {
+          items.push({ type: "bundle", bundle: b });
+        }
       }
       for (const p of filteredProducts) {
         items.push({ type: "product", product: p });
@@ -158,8 +184,7 @@ export function ProductAutocomplete({
     filteredProducts,
   ]);
 
-  const showDropdown = isOpen;
-
+  // Click-outside handler
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (
@@ -180,15 +205,20 @@ export function ProductAutocomplete({
 
   // Focus the search input when the dropdown opens
   useEffect(() => {
-    if (isOpen && searchInputRef.current) {
-      // Slight delay so the dropdown has rendered
-      setTimeout(() => searchInputRef.current?.focus(), 50);
-    }
-    if (!isOpen) {
+    if (isOpen) {
+      focusSearch();
+    } else {
       setActiveCategory(null);
       setSearchTerm("");
     }
-  }, [isOpen]);
+  }, [isOpen, focusSearch]);
+
+  // Re-focus search when drilling into a category
+  useEffect(() => {
+    if (isOpen && activeCategory !== null) {
+      focusSearch();
+    }
+  }, [activeCategory, isOpen, focusSearch]);
 
   // Scroll highlighted item into view
   useEffect(() => {
@@ -199,7 +229,7 @@ export function ProductAutocomplete({
   }, [highlightIndex]);
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (!showDropdown) {
+    if (!isOpen) {
       if (e.key === "ArrowDown" || e.key === "Enter") {
         e.preventDefault();
         setIsOpen(true);
@@ -241,8 +271,10 @@ export function ProductAutocomplete({
     return `£${parseFloat(price).toFixed(2)}`;
   };
 
-  const handleOpen = () => {
-    setIsOpen(true);
+  const handleCategoryClick = (key: string) => {
+    setActiveCategory(key);
+    setSearchTerm("");
+    focusSearch();
   };
 
   return (
@@ -254,10 +286,9 @@ export function ProductAutocomplete({
         onChange={(e) => {
           onChange(e.target.value);
           if (!isOpen) setIsOpen(true);
-          // Sync typed text into the search so the dropdown filters
           setSearchTerm(e.target.value);
         }}
-        onFocus={handleOpen}
+        onFocus={() => setIsOpen(true)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         title={value}
@@ -265,9 +296,15 @@ export function ProductAutocomplete({
         autoComplete="off"
       />
 
-      {showDropdown && (
-        <div className="absolute z-50 left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+      {isOpen && (
+        <div
+          className="absolute z-50 left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
           style={{ width: "min(420px, 90vw)" }}
+          onMouseDown={(e) => {
+            // Prevent any click inside the dropdown from stealing focus
+            // away from the search input and triggering a blur/close.
+            e.preventDefault();
+          }}
         >
           {/* Search bar */}
           <div className="p-2 border-b border-gray-100">
@@ -283,7 +320,9 @@ export function ProductAutocomplete({
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={
-                  activeCategory
+                  activeCategory === "_bundles"
+                    ? "Search bundles..."
+                    : activeCategory
                     ? `Search ${CATEGORY_LABELS[activeCategory] || activeCategory}...`
                     : "Search all products..."
                 }
@@ -296,7 +335,12 @@ export function ProductAutocomplete({
           {activeCategory && (
             <button
               type="button"
-              onClick={() => setActiveCategory(null)}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setActiveCategory(null);
+                setSearchTerm("");
+                focusSearch();
+              }}
               className="flex items-center gap-1 w-full px-3 py-1.5 text-xs text-[#1B4332] hover:bg-gray-50 border-b border-gray-100"
             >
               <ChevronLeft size={12} />
@@ -305,34 +349,22 @@ export function ProductAutocomplete({
           )}
 
           {/* Scrollable items list */}
-          <div
-            ref={listRef}
-            className="max-h-72 overflow-y-auto"
-          >
+          <div ref={listRef} className="max-h-72 overflow-y-auto">
             {flatItems.length === 0 && (
               <div className="px-3 py-6 text-center text-sm text-gray-400">
-                No products found
+                No {activeCategory === "_bundles" ? "bundles" : "products"} found
               </div>
             )}
 
-            {/* Section header for bundles when showing both */}
-            {!activeCategory &&
-              searchTerm.trim().length === 0 &&
-              filteredBundles.length > 0 &&
-              categories.length > 0 && (
-                <div className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-                  Bundles
-                </div>
-              )}
-
             {flatItems.map((item, idx) => {
               if (item.type === "category") {
+                const isBundles = item.key === "_bundles";
                 return (
                   <div
                     key={`cat-${item.key}`}
                     onMouseDown={(e) => {
                       e.preventDefault();
-                      setActiveCategory(item.key);
+                      handleCategoryClick(item.key);
                     }}
                     onMouseEnter={() => setHighlightIndex(idx)}
                     className={`flex items-center justify-between px-3 py-2.5 cursor-pointer text-sm ${
@@ -341,11 +373,14 @@ export function ProductAutocomplete({
                         : "hover:bg-gray-50 text-gray-900"
                     }`}
                   >
-                    <span className="font-medium capitalize">
+                    <span className="font-medium capitalize flex items-center gap-2">
+                      {isBundles && (
+                        <Package size={14} className="text-[#1B4332]" />
+                      )}
                       {item.label}
                     </span>
                     <span className="flex items-center gap-1 text-xs text-gray-400">
-                      {item.count} items
+                      {item.count} {isBundles ? "bundles" : "items"}
                       <ChevronRight size={14} />
                     </span>
                   </div>
@@ -354,49 +389,37 @@ export function ProductAutocomplete({
 
               if (item.type === "bundle") {
                 const b = item.bundle;
-                // Show before the category list, or inline when searching
-                // Render a separator if this is the first bundle after categories
-                const prevItem = idx > 0 ? flatItems[idx - 1] : null;
-                const showSeparator =
-                  prevItem?.type === "category" ||
-                  (idx === 0 && !activeCategory && searchTerm.trim().length === 0);
-
                 return (
-                  <React.Fragment key={`bundle-${b.id}`}>
-                    {showSeparator &&
-                      idx > 0 &&
-                      prevItem?.type === "category" && (
-                        <div className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-                          Bundles
-                        </div>
-                      )}
-                    <div
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        onSelectBundle?.(b);
-                        setIsOpen(false);
-                      }}
-                      onMouseEnter={() => setHighlightIndex(idx)}
-                      className={`px-3 py-2.5 cursor-pointer text-sm ${
-                        idx === highlightIndex
-                          ? "bg-[#1B4332] bg-opacity-10 text-[#1B4332]"
-                          : "hover:bg-gray-50 text-gray-900"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Package size={14} className="text-[#1B4332] shrink-0" />
-                        <span className="font-medium">{b.name}</span>
-                        <span className="text-xs text-gray-400 ml-auto whitespace-nowrap">
-                          {b.items.length} items
-                        </span>
-                      </div>
-                      {b.description && (
-                        <p className="text-xs text-gray-500 mt-0.5 ml-6 line-clamp-1">
-                          {b.description}
-                        </p>
-                      )}
+                  <div
+                    key={`bundle-${b.id}`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      onSelectBundle?.(b);
+                      setIsOpen(false);
+                    }}
+                    onMouseEnter={() => setHighlightIndex(idx)}
+                    className={`px-3 py-2.5 cursor-pointer text-sm ${
+                      idx === highlightIndex
+                        ? "bg-[#1B4332] bg-opacity-10 text-[#1B4332]"
+                        : "hover:bg-gray-50 text-gray-900"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Package
+                        size={14}
+                        className="text-[#1B4332] shrink-0"
+                      />
+                      <span className="font-medium">{b.name}</span>
+                      <span className="text-xs text-gray-400 ml-auto whitespace-nowrap">
+                        {b.items.length} items
+                      </span>
                     </div>
-                  </React.Fragment>
+                    {b.description && (
+                      <p className="text-xs text-gray-500 mt-0.5 ml-6 line-clamp-1">
+                        {b.description}
+                      </p>
+                    )}
+                  </div>
                 );
               }
 
