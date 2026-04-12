@@ -80,3 +80,109 @@
 .ag-theme-custom .ag-paging-button:disabled {
   opacity: 0.5;
 }
+
+/* ── Filter popup / floating filter ── */
+
+.ag-theme-custom .ag-filter,
+.ag-theme-custom .ag-popup-child,
+.ag-theme-custom .ag-menu {
+  background-color: #FFFFFF;
+  color: #1F2937;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.ag-theme-custom .ag-filter-toolpanel-header,
+.ag-theme-custom .ag-filter-header-container {
+  background-color: #FFFFFF;
+  color: #1F2937;
+}
+
+.ag-theme-custom .ag-filter input[type="text"],
+.ag-theme-custom .ag-filter input[type="number"],
+.ag-theme-custom .ag-text-field-input,
+.ag-theme-custom .ag-filter .ag-input-field-input {
+  background-color: #FFFFFF;
+  color: #1F2937;
+  border: 1px solid #D1D5DB;
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+
+.ag-theme-custom .ag-filter input[type="text"]:focus,
+.ag-theme-custom .ag-filter input[type="number"]:focus,
+.ag-theme-custom .ag-text-field-input:focus {
+  border-color: #1B4332;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(27, 67, 50, 0.2);
+}
+
+.ag-theme-custom .ag-filter select,
+.ag-theme-custom .ag-picker-field-wrapper {
+  background-color: #FFFFFF;
+  color: #1F2937;
+  border: 1px solid #D1D5DB;
+  border-radius: 4px;
+}
+
+.ag-theme-custom .ag-filter-apply-panel button,
+.ag-theme-custom .ag-standard-button {
+  background-color: #FFFFFF;
+  color: #1B4332;
+  border: 1px solid #1B4332;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ag-theme-custom .ag-filter-apply-panel button:hover,
+.ag-theme-custom .ag-standard-button:hover {
+  background-color: #1B4332;
+  color: #FFFFFF;
+}
+
+/* Filter icon in header -- make it visible on dark header */
+.ag-theme-custom .ag-header-cell .ag-icon-filter,
+.ag-theme-custom .ag-header-cell .ag-icon-menu,
+.ag-theme-custom .ag-header-cell .ag-icon-columns,
+.ag-theme-custom .ag-header-cell .ag-header-icon {
+  color: #FFFFFF;
+}
+
+/* Column menu tabs */
+.ag-theme-custom .ag-tab {
+  background-color: #FFFFFF;
+  color: #1F2937;
+}
+
+.ag-theme-custom .ag-tab-selected {
+  border-bottom-color: #1B4332;
+  color: #1B4332;
+}
+
+/* Checkbox styling inside filters */
+.ag-theme-custom .ag-filter .ag-checkbox-input-wrapper::after {
+  color: #1B4332;
+}
+
+.ag-theme-custom .ag-set-filter-list {
+  background-color: #FFFFFF;
+  color: #1F2937;
+}
+
+.ag-theme-custom .ag-set-filter-item {
+  color: #1F2937;
+}
+
+/* Floating filter row (if enabled) */
+.ag-theme-custom .ag-floating-filter {
+  background-color: #F9FAFB;
+}
+
+.ag-theme-custom .ag-floating-filter-input {
+  background-color: #FFFFFF;
+  color: #1F2937;
+  border: 1px solid #D1D5DB;
+}

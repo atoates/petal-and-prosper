@@ -383,7 +383,7 @@ export default function LibrariesPage() {
                 className={`px-4 py-2 rounded-lg font-medium transition-colours ${
                   (selectedCategory === category || (selectedCategory === null && category === "All"))
                     ? "bg-[#1B4332] text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
                 }`}
               >
                 {category}
