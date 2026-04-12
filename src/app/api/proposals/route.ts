@@ -14,7 +14,11 @@ export async function GET(_request: NextRequest) {
     const result = await db.query.proposals.findMany({
       where: eq(proposals.companyId, ctx.companyId),
       with: {
-        order: true,
+        order: {
+          with: {
+            enquiry: true,
+          },
+        },
       },
       orderBy: desc(proposals.createdAt),
     });

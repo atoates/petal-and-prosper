@@ -18,7 +18,11 @@ export async function GET(_request: NextRequest) {
     const result = await db.query.productionSchedules.findMany({
       where: eq(productionSchedules.companyId, ctx.companyId),
       with: {
-        order: true,
+        order: {
+          with: {
+            enquiry: true,
+          },
+        },
         items: true,
       },
       orderBy: desc(productionSchedules.createdAt),

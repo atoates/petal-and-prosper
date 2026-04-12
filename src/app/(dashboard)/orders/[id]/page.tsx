@@ -7,8 +7,9 @@ import toast from "react-hot-toast";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, Pencil } from "lucide-react";
 import { Can } from "@/components/auth/can";
+import { OrderModal } from "@/components/orders/order-modal";
 
 type TabKey =
   | "enquiry"
@@ -136,6 +137,7 @@ export default function OrderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("enquiry");
 
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [applyingPricing, setApplyingPricing] = useState(false);
   const [sendingProposalId, setSendingProposalId] = useState<string | null>(
     null
@@ -228,6 +230,15 @@ export default function OrderDetailPage() {
       );
     } finally {
       setApplyingPricing(false);
+    }
+  };
+
+  const handleSaveOrder = async (_updated: Record<string, unknown>) => {
+    // The OrderModal already PUTs to /api/orders/:id internally, so we
+    // just need to refresh the local state after the modal closes.
+    const res = await fetch(`/api/orders/${id}`);
+    if (res.ok) {
+      setOrder(await res.json());
     }
   };
 
@@ -482,23 +493,44 @@ export default function OrderDetailPage() {
                 </div>
               </div>
               <Can permission="orders:update">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleApplyPricing}
-                  disabled={applyingPricing || !order.items || order.items.length === 0}
-                >
-                  {applyingPricing ? "Applying..." : "Apply pricing rules"}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="primary"
+                    onClick={() => setIsEditModalOpen(true)}
+                  >
+                    <Pencil size={16} className="mr-1" />
+                    Edit order
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleApplyPricing}
+                    disabled={applyingPricing || !order.items || order.items.length === 0}
+                  >
+                    {applyingPricing ? "Applying..." : "Apply pricing rules"}
+                  </Button>
+                </div>
               </Can>
             </div>
           </CardHeader>
           <CardBody className="p-0">
             {!order.items || order.items.length === 0 ? (
-              <p className="text-sm text-gray-500 p-6">
-                No line items yet. Use the Edit button on the order row to add
-                items.
-              </p>
+              <div className="text-center py-10 px-6">
+                <p className="text-sm text-gray-500 mb-4">
+                  No line items yet.
+                </p>
+                <Can permission="orders:update">
+                  <Button
+                    type="button"
+                    variant="primary"
+                    onClick={() => setIsEditModalOpen(true)}
+                  >
+                    <Plus size={16} className="mr-1" />
+                    Add items
+                  </Button>
+                </Can>
+              </div>
             ) : (
               <div className="overflow-x-auto">
               <table className="w-full min-w-[640px]">
@@ -812,6 +844,23 @@ export default function OrderDetailPage() {
             )}
           </CardBody>
         </Card>
+      )}
+      {order && (
+        <OrderModal
+          isOpen={isEditModalOpen}
+          order={{
+            id: order.id,
+            enquiryId: order.enquiryId,
+            status: order.status as any,
+            version: order.version ?? 1,
+            totalPrice: order.totalPrice,
+            items: order.items,
+            enquiry: order.enquiry ? { clientName: order.enquiry.clientName } : undefined,
+            createdAt: order.createdAt,
+          }}
+          onClose={() => setIsEditModalOpen(false)}
+          onSave={handleSaveOrder}
+        />
       )}
     </div>
   );

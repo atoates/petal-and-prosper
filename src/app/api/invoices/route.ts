@@ -19,7 +19,11 @@ export async function GET(_request: NextRequest) {
     const result = await db.query.invoices.findMany({
       where: eq(invoices.companyId, ctx.companyId),
       with: {
-        order: true,
+        order: {
+          with: {
+            enquiry: true,
+          },
+        },
       },
       orderBy: desc(invoices.createdAt),
     });

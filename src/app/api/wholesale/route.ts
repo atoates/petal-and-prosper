@@ -18,7 +18,11 @@ export async function GET(_request: NextRequest) {
     const result = await db.query.wholesaleOrders.findMany({
       where: eq(wholesaleOrders.companyId, ctx.companyId),
       with: {
-        order: true,
+        order: {
+          with: {
+            enquiry: true,
+          },
+        },
         items: true,
       },
       orderBy: desc(wholesaleOrders.createdAt),
