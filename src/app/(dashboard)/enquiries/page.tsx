@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Edit2, Trash2, FilePlus, Archive, ArchiveRestore } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, FilePlus, Archive, ArchiveRestore, Loader2 } from "lucide-react";
 import { Can } from "@/components/auth/can";
 import { EnquiryModal } from "@/components/enquiries/enquiry-modal";
 
@@ -37,6 +37,11 @@ export default function EnquiriesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEnquiry, setSelectedEnquiry] = useState<Enquiry | null>(null);
   const [creatingOrderFor, setCreatingOrderFor] = useState<string | null>(null);
+  // Per-row delete state (#27). Disables the delete button and
+  // swaps the trash icon for a spinner while the DELETE is in
+  // flight so users can't double-click the same row during the
+  // round-trip.
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [view, setView] = useState<EnquiryView>("active");
 
   const refreshEnquiries = async (nextView: EnquiryView = view) => {
@@ -199,10 +204,12 @@ export default function EnquiriesPage() {
   };
 
   const handleDeleteEnquiry = async (id: string) => {
+    if (deletingId) return; // guard against double-click
     if (!confirm("Are you sure you want to delete this enquiry? This will also delete any associated orders.")) {
       return;
     }
 
+    setDeletingId(id);
     try {
       const response = await fetch(`/api/enquiries/${id}`, {
         method: "DELETE",
@@ -216,6 +223,8 @@ export default function EnquiriesPage() {
     } catch (err) {
       console.error("Error deleting enquiry:", err);
       toast.error("Failed to delete enquiry");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -422,10 +431,16 @@ export default function EnquiriesPage() {
                           <button
                             type="button"
                             onClick={() => handleDeleteEnquiry(enquiry.id)}
-                            className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                            disabled={deletingId === enquiry.id}
+                            className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Delete"
+                            aria-label="Delete enquiry"
                           >
-                            <Trash2 size={16} />
+                            {deletingId === enquiry.id ? (
+                              <Loader2 size={16} className="animate-spin" />
+                            ) : (
+                              <Trash2 size={16} />
+                            )}
                           </button>
                         </Can>
                       </div>

@@ -6,7 +6,7 @@ import { Card, CardHeader, CardBody, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Loader2 } from "lucide-react";
 
 type Role = "admin" | "manager" | "staff";
 
@@ -50,6 +50,10 @@ export default function UserPage() {
     role: "staff" as Role,
   });
   const [addingUser, setAddingUser] = useState(false);
+  // Per-row delete state (#27): disables the remove button and
+  // swaps the trash icon for a spinner during the DELETE round-trip
+  // so users can't double-click the same row.
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const isAdmin = me?.role === "admin";
 
@@ -175,15 +179,21 @@ export default function UserPage() {
   };
 
   const handleRemove = async (memberId: string) => {
+    if (deletingId) return;
     if (!confirm("Remove this team member? This cannot be undone.")) return;
-    const res = await fetch(`/api/users/${memberId}`, { method: "DELETE" });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      toast.error(err.error ?? "Failed to remove team member");
-      return;
+    setDeletingId(memberId);
+    try {
+      const res = await fetch(`/api/users/${memberId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error ?? "Failed to remove team member");
+        return;
+      }
+      toast.success("Team member removed");
+      await fetchAll();
+    } finally {
+      setDeletingId(null);
     }
-    toast.success("Team member removed");
-    await fetchAll();
   };
 
   return (
@@ -258,8 +268,14 @@ export default function UserPage() {
                                 variant="outline"
                                 type="button"
                                 onClick={() => handleRemove(member.id)}
+                                disabled={deletingId === member.id}
+                                aria-label="Remove team member"
                               >
-                                <Trash2 size={16} />
+                                {deletingId === member.id ? (
+                                  <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                  <Trash2 size={16} />
+                                )}
                               </Button>
                             )}
                           </td>

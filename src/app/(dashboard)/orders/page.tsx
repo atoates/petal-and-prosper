@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit2, Trash2, ExternalLink } from "lucide-react";
+import { Plus, Edit2, Trash2, ExternalLink, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { OrderModal } from "@/components/orders/order-modal";
 import { Can } from "@/components/auth/can";
@@ -56,6 +56,9 @@ export default function OrdersPage() {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  // Per-row delete state (#27): prevents double-click and shows a
+  // spinner while the DELETE is in flight.
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -151,10 +154,12 @@ export default function OrdersPage() {
   };
 
   const handleDeleteOrder = async (id: string) => {
+    if (deletingId) return;
     if (!confirm("Are you sure you want to delete this order?")) {
       return;
     }
 
+    setDeletingId(id);
     try {
       const response = await fetch(`/api/orders/${id}`, {
         method: "DELETE",
@@ -170,6 +175,8 @@ export default function OrdersPage() {
     } catch (err) {
       console.error("Error deleting order:", err);
       toast.error("Failed to delete order");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -292,10 +299,16 @@ export default function OrdersPage() {
                           <button
                             type="button"
                             onClick={() => handleDeleteOrder(order.id)}
-                            className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                            disabled={deletingId === order.id}
+                            className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Delete"
+                            aria-label="Delete order"
                           >
-                            <Trash2 size={16} />
+                            {deletingId === order.id ? (
+                              <Loader2 size={16} className="animate-spin" />
+                            ) : (
+                              <Trash2 size={16} />
+                            )}
                           </button>
                         </Can>
                       </div>

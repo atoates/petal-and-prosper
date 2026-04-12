@@ -6,7 +6,7 @@ import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, Loader2 } from "lucide-react";
 import { Can } from "@/components/auth/can";
 
 /**
@@ -130,6 +130,11 @@ export default function DeliveryPage() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Per-row delete state (#27). Separate ids for the schedule
+  // list and the saved-venue book inside the delivery modal so
+  // each widget manages its own spinner state.
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingVenueId, setDeletingVenueId] = useState<string | null>(null);
 
   // Saved venue book modal -- opened from a small link in the main
   // delivery modal so venue management happens inline rather than
@@ -347,10 +352,12 @@ export default function DeliveryPage() {
   };
 
   const handleDelete = async (schedule: DeliverySchedule) => {
+    if (deletingId) return;
     if (
       !window.confirm("Delete this delivery schedule? This cannot be undone.")
     )
       return;
+    setDeletingId(schedule.id);
     try {
       const response = await fetch(`/api/delivery/${schedule.id}`, {
         method: "DELETE",
@@ -359,6 +366,8 @@ export default function DeliveryPage() {
       setSchedules((prev) => prev.filter((s) => s.id !== schedule.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -428,7 +437,9 @@ export default function DeliveryPage() {
   };
 
   const handleVenueDelete = async (venue: Venue) => {
+    if (deletingVenueId) return;
     if (!window.confirm(`Delete venue "${venue.name}"?`)) return;
+    setDeletingVenueId(venue.id);
     try {
       const response = await fetch(`/api/venues/${venue.id}`, {
         method: "DELETE",
@@ -442,6 +453,8 @@ export default function DeliveryPage() {
       );
     } catch (err) {
       setVenueError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setDeletingVenueId(null);
     }
   };
 
@@ -588,10 +601,15 @@ export default function DeliveryPage() {
                           <button
                             type="button"
                             onClick={() => handleDelete(schedule)}
-                            className="p-2 text-gray-600 hover:text-red-700 hover:bg-gray-100 rounded"
+                            disabled={deletingId === schedule.id}
+                            className="p-2 text-gray-600 hover:text-red-700 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                             aria-label="Delete delivery"
                           >
-                            <Trash2 size={16} />
+                            {deletingId === schedule.id ? (
+                              <Loader2 size={16} className="animate-spin" />
+                            ) : (
+                              <Trash2 size={16} />
+                            )}
                           </button>
                         </Can>
                       </div>
@@ -811,10 +829,15 @@ export default function DeliveryPage() {
                             <button
                               type="button"
                               onClick={() => handleVenueDelete(v)}
-                              className="p-2 text-gray-600 hover:text-red-700 hover:bg-gray-100 rounded"
+                              disabled={deletingVenueId === v.id}
+                              className="p-2 text-gray-600 hover:text-red-700 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                               aria-label="Delete venue"
                             >
-                              <Trash2 size={14} />
+                              {deletingVenueId === v.id ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : (
+                                <Trash2 size={14} />
+                              )}
                             </button>
                           </Can>
                         </div>

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Loader2 } from "lucide-react";
 import { Can } from "@/components/auth/can";
 
 /**
@@ -121,6 +121,9 @@ export default function ProductionPage() {
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Per-row delete state (#27): one at a time, disables the row
+  // and swaps the trash icon for a spinner during the round-trip.
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     orderId: "",
@@ -306,6 +309,7 @@ export default function ProductionPage() {
   };
 
   const handleDelete = async (schedule: ProductionSchedule) => {
+    if (deletingId) return;
     if (
       !window.confirm(
         "Delete this production schedule? This cannot be undone."
@@ -313,6 +317,7 @@ export default function ProductionPage() {
     ) {
       return;
     }
+    setDeletingId(schedule.id);
     try {
       const response = await fetch(`/api/production/${schedule.id}`, {
         method: "DELETE",
@@ -323,6 +328,8 @@ export default function ProductionPage() {
       setSchedules((prev) => prev.filter((s) => s.id !== schedule.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -451,10 +458,15 @@ export default function ProductionPage() {
                           <button
                             type="button"
                             onClick={() => handleDelete(schedule)}
-                            className="p-2 text-gray-600 hover:text-red-700 hover:bg-gray-100 rounded"
+                            disabled={deletingId === schedule.id}
+                            className="p-2 text-gray-600 hover:text-red-700 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                             aria-label="Delete schedule"
                           >
-                            <Trash2 size={16} />
+                            {deletingId === schedule.id ? (
+                              <Loader2 size={16} className="animate-spin" />
+                            ) : (
+                              <Trash2 size={16} />
+                            )}
                           </button>
                         </Can>
                       </div>
