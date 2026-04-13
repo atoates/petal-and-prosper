@@ -144,6 +144,9 @@ export const orderItemBodySchema = z.object({
   // consumes this schema runs the input through the pricing helper.
   unitPrice: decimalField,
   totalPrice: decimalField,
+  // Product image URL, captured at order time so it persists even if
+  // the product library entry is later updated.
+  imageUrl: optionalTrimmed(2000),
 });
 
 export const orderCreateSchema = z.object({
@@ -252,6 +255,7 @@ export const productBodySchema = z.object({
   colour: optionalTrimmed(100),
   season: optionalTrimmed(100),
   supplier: optionalTrimmed(200),
+  imageUrl: optionalTrimmed(2000),
   notes: optionalTrimmed(2000),
   isActive: z.boolean().optional(),
 });

@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
         colour: data.colour,
         season: data.season,
         supplier: data.supplier,
+        imageUrl: data.imageUrl,
         notes: data.notes,
         isActive: data.isActive ?? true,
         createdBy: ctx.userId,

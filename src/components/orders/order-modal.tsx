@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Trash2, ChevronDown, ChevronUp, Package } from "lucide-react";
+import { ProductImage } from "@/components/ui/product-image";
 import {
   ProductAutocomplete,
   type Bundle,
@@ -31,6 +32,8 @@ interface OrderItem {
   bundleId?: string;
   bundleName?: string;
   baseQuantity?: number;
+  // Product image for visual reference
+  imageUrl?: string | null;
 }
 
 interface PricingRulesShape {
@@ -136,13 +139,23 @@ function LineItemRow({
           <label className="block text-xs font-medium text-gray-700 mb-1">
             Description
           </label>
-          <input
-            type="text"
-            value={item.description}
-            onChange={(e) => onItemChange(index, "description", e.target.value)}
-            placeholder="Item description"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4332] focus:border-transparent transition-colors text-sm"
-          />
+          <div className="flex items-center gap-1.5">
+            {item.imageUrl && (
+              <ProductImage
+                imageUrl={item.imageUrl}
+                name={item.description}
+                category={item.category}
+                iconSize={14}
+              />
+            )}
+            <input
+              type="text"
+              value={item.description}
+              onChange={(e) => onItemChange(index, "description", e.target.value)}
+              placeholder="Item description"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4332] focus:border-transparent transition-colors text-sm"
+            />
+          </div>
         </div>
 
         <div>
@@ -423,6 +436,7 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
       quantity,
       unitPrice: unitPrice.toFixed(2),
       totalPrice: (quantity * unitPrice).toFixed(2),
+      imageUrl: product.imageUrl,
     };
 
     setFormData((prev) => ({
@@ -461,6 +475,7 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
         totalPrice: (quantity * unitPrice).toFixed(2),
         bundleId,
         bundleName: bundle.name,
+        imageUrl: prod?.imageUrl,
       };
     });
 

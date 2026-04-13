@@ -311,6 +311,7 @@ export const orderItems = pgTable(
     baseCost: decimal("base_cost", { precision: 10, scale: 2 }),
     unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
     totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+    imageUrl: text("image_url"),
     createdBy: text("created_by").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -669,6 +670,7 @@ export const products = pgTable(
     colour: varchar("colour", { length: 100 }),
     season: varchar("season", { length: 100 }),
     supplier: varchar("supplier", { length: 255 }),
+    imageUrl: text("image_url"),
     notes: text("notes"),
     isActive: boolean("is_active").notNull().default(true),
     createdBy: text("created_by").references(() => users.id, {

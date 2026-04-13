@@ -4,10 +4,9 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { Card, CardBody, CardHeader, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, X, Upload, Package, Trash2, ChevronDown, ChevronUp } from "lucide-react";
-import { ColDef } from "ag-grid-community";
-import { DataGrid } from "@/components/ui/data-grid";
-import { CurrencyRenderer, CategoryBadgeRenderer } from "@/components/ui/grid-renderers";
+import { Plus, X, Upload, Package, Trash2, ChevronDown, ChevronUp, Search, Image as ImageIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ProductImage, ProductThumbnail } from "@/components/ui/product-image";
 import { Can } from "@/components/auth/can";
 import toast from "react-hot-toast";
 
@@ -25,6 +24,7 @@ interface Product {
   colour?: string;
   season?: string;
   supplier?: string;
+  imageUrl?: string | null;
   isActive: boolean;
 }
 
@@ -54,6 +54,7 @@ interface FormData {
   colour: string;
   season: string;
   supplier: string;
+  imageUrl: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -101,6 +102,7 @@ export default function LibrariesPage() {
     colour: "",
     season: "",
     supplier: "",
+    imageUrl: "",
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -488,19 +490,76 @@ export default function LibrariesPage() {
   };
 
   /* ------------------------------------------------------------------ */
-  /*  Column defs                                                        */
+  /*  Products search & sort                                             */
   /* ------------------------------------------------------------------ */
 
-  const columnDefs: ColDef[] = [
-    { field: "name", headerName: "Name", width: 180, sortable: true, filter: true },
-    { field: "category", headerName: "Category", width: 140, cellRenderer: CategoryBadgeRenderer, sortable: true, filter: true },
-    { field: "subcategory", headerName: "Subcategory", width: 140, sortable: true, filter: true },
-    { field: "wholesalePrice", headerName: "Wholesale Price", width: 140, cellRenderer: CurrencyRenderer, sortable: true, filter: true },
-    { field: "retailPrice", headerName: "Retail Price", width: 140, cellRenderer: CurrencyRenderer, sortable: true, filter: true },
-    { field: "colour", headerName: "Colour", width: 120, sortable: true, filter: true },
-    { field: "season", headerName: "Season", width: 120, sortable: true, filter: true },
-    { field: "supplier", headerName: "Supplier", width: 140, sortable: true, filter: true },
-  ];
+  const [productSearch, setProductSearch] = useState("");
+  const [sortField, setSortField] = useState<string>("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const displayedProducts = useMemo(() => {
+    let list = filteredProducts;
+
+    // Quick search
+    if (productSearch.trim()) {
+      const q = productSearch.toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (p.category || "").toLowerCase().includes(q) ||
+          (p.subcategory || "").toLowerCase().includes(q) ||
+          (p.colour || "").toLowerCase().includes(q) ||
+          (p.season || "").toLowerCase().includes(q) ||
+          (p.supplier || "").toLowerCase().includes(q)
+      );
+    }
+
+    // Sort
+    return [...list].sort((a, b) => {
+      const av = (a as Record<string, unknown>)[sortField];
+      const bv = (b as Record<string, unknown>)[sortField];
+      const aStr = (av ?? "").toString().toLowerCase();
+      const bStr = (bv ?? "").toString().toLowerCase();
+      const cmp = aStr.localeCompare(bStr, undefined, { numeric: true });
+      return sortDirection === "asc" ? cmp : -cmp;
+    });
+  }, [filteredProducts, productSearch, sortField, sortDirection]);
+
+  const formatPrice = (val?: string) => {
+    if (!val) return "-";
+    const n = parseFloat(val);
+    return isNaN(n) ? "-" : `\u00a3${n.toFixed(2)}`;
+  };
+
+  const categoryLabel = (cat: string) => {
+    const labels: Record<string, string> = {
+      flower: "Flower",
+      foliage: "Foliage",
+      sundry: "Sundry",
+      container: "Container",
+      ribbon: "Ribbon",
+      accessory: "Accessory",
+    };
+    return labels[cat] || cat;
+  };
+
+  const SortIcon = ({ field }: { field: string }) => {
+    if (sortField !== field) return null;
+    return sortDirection === "asc" ? (
+      <ChevronUp size={14} className="inline ml-0.5" />
+    ) : (
+      <ChevronDown size={14} className="inline ml-0.5" />
+    );
+  };
 
   /* ------------------------------------------------------------------ */
   /*  Render                                                             */
@@ -621,16 +680,135 @@ export default function LibrariesPage() {
             </CardBody>
           </Card>
 
+          {/* Quick search */}
+          <div className="relative mb-4">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={productSearch}
+              onChange={(e) => setProductSearch(e.target.value)}
+              className="w-full sm:w-80 pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B4332] focus:border-transparent"
+            />
+          </div>
+
           {/* Products Table */}
           <Card>
             <CardBody className="p-0">
-              <DataGrid
-                rowData={filteredProducts}
-                columnDefs={columnDefs}
-                loading={loading}
-                emptyMessage="No products found. Add your first product to get started."
-                pageSize={20}
-              />
+              {loading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-sage-200 border-t-dark-green" />
+                </div>
+              ) : displayedProducts.length === 0 ? (
+                <div className="text-center py-16 text-gray-500">
+                  <p>No products found. Add your first product to get started.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-10"></th>
+                        <th
+                          className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700"
+                          onClick={() => handleSort("name")}
+                        >
+                          Name <SortIcon field="name" />
+                        </th>
+                        <th
+                          className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700"
+                          onClick={() => handleSort("category")}
+                        >
+                          Category <SortIcon field="category" />
+                        </th>
+                        <th
+                          className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700"
+                          onClick={() => handleSort("subcategory")}
+                        >
+                          Subcategory <SortIcon field="subcategory" />
+                        </th>
+                        <th
+                          className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700"
+                          onClick={() => handleSort("wholesalePrice")}
+                        >
+                          Wholesale <SortIcon field="wholesalePrice" />
+                        </th>
+                        <th
+                          className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700"
+                          onClick={() => handleSort("retailPrice")}
+                        >
+                          Retail <SortIcon field="retailPrice" />
+                        </th>
+                        <th
+                          className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700"
+                          onClick={() => handleSort("colour")}
+                        >
+                          Colour <SortIcon field="colour" />
+                        </th>
+                        <th
+                          className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700"
+                          onClick={() => handleSort("season")}
+                        >
+                          Season <SortIcon field="season" />
+                        </th>
+                        <th
+                          className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700"
+                          onClick={() => handleSort("supplier")}
+                        >
+                          Supplier <SortIcon field="supplier" />
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {displayedProducts.map((product) => (
+                        <tr
+                          key={product.id}
+                          className="hover:bg-gray-50 transition-colors"
+                        >
+                          <td className="px-4 py-3">
+                            <ProductImage
+                              imageUrl={product.imageUrl}
+                              name={product.name}
+                              category={categoryLabel(product.category)}
+                              colour={product.colour}
+                              season={product.season}
+                              supplier={product.supplier}
+                              showThumbnail
+                              thumbnailSize={36}
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                            {product.name}
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge variant="secondary">
+                              {categoryLabel(product.category)}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {product.subcategory || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">
+                            {formatPrice(product.wholesalePrice)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">
+                            {formatPrice(product.retailPrice)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {product.colour || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {product.season || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {product.supplier || "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardBody>
           </Card>
         </>
@@ -1166,7 +1344,7 @@ export default function LibrariesPage() {
                   </select>
                 </div>
 
-                <div className="col-span-2">
+                <div className="col-span-2 sm:col-span-1">
                   <label className="block text-sm font-medium text-gray-900 mb-2">
                     Supplier
                   </label>
@@ -1177,6 +1355,38 @@ export default function LibrariesPage() {
                     value={formData.supplier}
                     onChange={handleFormChange}
                   />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    <span className="flex items-center gap-1.5">
+                      <ImageIcon size={14} />
+                      Image URL
+                    </span>
+                  </label>
+                  <div className="flex gap-3 items-start">
+                    <div className="flex-1">
+                      <Input
+                        type="url"
+                        name="imageUrl"
+                        placeholder="https://images.unsplash.com/..."
+                        value={formData.imageUrl}
+                        onChange={handleFormChange}
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Paste a direct link to a product photo
+                      </p>
+                    </div>
+                    {formData.imageUrl && (
+                      <div className="shrink-0">
+                        <ProductThumbnail
+                          src={formData.imageUrl}
+                          alt="Preview"
+                          size={44}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardBody>

@@ -16,6 +16,9 @@ import {
   MapPin,
   CheckSquare,
   Square,
+  Copy,
+  Check,
+  Smartphone,
 } from "lucide-react";
 
 /**
@@ -104,7 +107,7 @@ function formatDuration(mins: number): string {
  */
 function buildEmbedUrl(
   origin: string,
-  stops: Array<{ address: string }>
+  stops: Array<{ address: string; label?: string }>
 ): string {
   if (stops.length === 0) return "";
   const destination = stops[stops.length - 1].address;
@@ -114,6 +117,7 @@ function buildEmbedUrl(
     origin,
     destination,
     mode: "driving",
+    avoid: "tolls",
   });
   if (waypoints) {
     params.append("waypoints", waypoints);
@@ -139,6 +143,18 @@ export default function RoutePlannerPage() {
   // AI advice state
   const [askingAi, setAskingAi] = useState(false);
   const [aiAdvice, setAiAdvice] = useState<string | null>(null);
+
+  // Copy link state
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const handleCopyRouteLink = () => {
+    if (!routeResult?.mapUrl) return;
+    navigator.clipboard.writeText(routeResult.mapUrl).then(() => {
+      setLinkCopied(true);
+      toast.success("Route link copied to clipboard");
+      setTimeout(() => setLinkCopied(false), 3000);
+    });
+  };
 
   // Fetch all deliveries and studio address on mount
   useEffect(() => {
@@ -551,19 +567,39 @@ export default function RoutePlannerPage() {
 
                 <Card>
                   <CardBody>
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                       <h3 className="text-lg font-serif font-semibold text-gray-900">
                         Optimised Route
                       </h3>
-                      <a
-                        href={routeResult.mapUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-sm text-[#1B4332] hover:underline font-medium"
-                      >
-                        Open in Google Maps
-                        <ExternalLink size={14} />
-                      </a>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleCopyRouteLink}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-[#1B4332] hover:bg-gray-100 rounded-lg transition-colors font-medium"
+                          title="Copy route link to send to your device"
+                        >
+                          {linkCopied ? (
+                            <>
+                              <Check size={14} className="text-green-600" />
+                              <span className="text-green-600">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Smartphone size={14} />
+                              Send to device
+                            </>
+                          )}
+                        </button>
+                        <a
+                          href={routeResult.mapUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#1B4332] hover:bg-sage-50 rounded-lg transition-colors font-medium"
+                        >
+                          Open in Maps
+                          <ExternalLink size={14} />
+                        </a>
+                      </div>
                     </div>
 
                     {/* Start point */}

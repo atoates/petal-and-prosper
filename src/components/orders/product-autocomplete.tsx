@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { ChevronRight, ChevronLeft, Package, Search } from "lucide-react";
+import { ChevronRight, ChevronLeft, Package, Search, ImageOff } from "lucide-react";
 
 export interface Product {
   id: string;
@@ -12,6 +12,7 @@ export interface Product {
   retailPrice?: string;
   colour?: string;
   unit?: string;
+  imageUrl?: string | null;
 }
 
 export interface BundleItem {
@@ -482,13 +483,25 @@ export function ProductAutocomplete({
                 afterSelect();
               }}
               onMouseEnter={() => setHighlightIndex(idx)}
-              className={`px-3 py-2 cursor-pointer text-sm flex items-center justify-between gap-2 ${
+              className={`px-3 py-2 cursor-pointer text-sm flex items-center gap-2.5 ${
                 idx === highlightIndex
                   ? "bg-[#1B4332] bg-opacity-10 text-[#1B4332]"
                   : "hover:bg-gray-50 text-gray-900"
               }`}
             >
-              <span className="font-medium min-w-0">
+              {p.imageUrl ? (
+                <img
+                  src={p.imageUrl}
+                  alt=""
+                  className="w-7 h-7 rounded object-cover shrink-0"
+                  onError={(e) => { e.currentTarget.style.display = "none"; }}
+                />
+              ) : (
+                <span className="w-7 h-7 rounded bg-gray-100 flex items-center justify-center shrink-0">
+                  <ImageOff size={12} className="text-gray-300" />
+                </span>
+              )}
+              <span className="font-medium min-w-0 flex-1">
                 {p.name}
                 {p.colour && (
                   <span className="text-gray-500 font-normal">

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Plus, Pencil } from "lucide-react";
 import { Can } from "@/components/auth/can";
+import { ProductImage } from "@/components/ui/product-image";
 import { OrderModal } from "@/components/orders/order-modal";
 
 type TabKey =
@@ -27,6 +28,7 @@ interface OrderItem {
   quantity: number;
   unitPrice: string;
   totalPrice: string;
+  imageUrl?: string | null;
 }
 
 interface Enquiry {
@@ -564,7 +566,18 @@ export default function OrderDetailPage() {
                   {order.items.map((item) => (
                     <tr key={item.id} className="border-b border-gray-100">
                       <td className="px-6 py-3 text-sm text-gray-900">
-                        {item.description}
+                        <span className="flex items-center gap-2">
+                          {item.imageUrl && (
+                            <ProductImage
+                              imageUrl={item.imageUrl}
+                              name={item.description}
+                              category={item.category}
+                              showThumbnail
+                              thumbnailSize={28}
+                            />
+                          )}
+                          {item.description}
+                        </span>
                       </td>
                       <td className="px-6 py-3 text-sm text-gray-600">
                         {item.category || "-"}

@@ -29,6 +29,13 @@
       "when": 1744742400000,
       "tag": "0003_add_travel_costs_and_geocoding",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1744828800000,
+      "tag": "0004_add_product_images",
+      "breakpoints": true
     }
   ]
 }

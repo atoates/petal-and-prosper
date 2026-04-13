@@ -9,6 +9,7 @@ import { Select } from "@/components/ui/select";
 import { Pencil, Plus, Trash2, Loader2, Map, Calculator, Search, ChevronUp, ChevronDown } from "lucide-react";
 import { Can } from "@/components/auth/can";
 import Link from "next/link";
+import { DeliveryMap } from "@/components/delivery/delivery-map";
 
 /**
  * /delivery
@@ -577,6 +578,26 @@ export default function DeliveryPage() {
             <p className="text-red-800">Error: {error}</p>
           </CardBody>
         </Card>
+      )}
+
+      {/* Delivery map */}
+      {!loading && schedules.length > 0 && (
+        <DeliveryMap
+          deliveries={schedules
+            .filter((s) => s.deliveryAddress || s.venue?.address)
+            .map((s) => ({
+              id: s.id,
+              address: s.deliveryAddress || s.venue?.address || "",
+              clientName: s.order?.enquiry?.clientName || "Unknown client",
+              venueName: s.venue?.name || undefined,
+              date: s.deliveryDate || undefined,
+              timeSlot: s.timeSlot || undefined,
+              status: s.status,
+              driverName: driverLabel(team, s.driverId) !== "Unassigned"
+                ? driverLabel(team, s.driverId)
+                : undefined,
+            }))}
+        />
       )}
 
       <Card>
