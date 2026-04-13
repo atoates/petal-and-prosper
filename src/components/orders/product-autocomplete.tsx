@@ -38,6 +38,8 @@ interface ProductAutocompleteProps {
   onSelect: (product: Product) => void;
   onSelectBundle?: (bundle: Bundle) => void;
   placeholder?: string;
+  /** When true, the input clears after a product or bundle is selected. */
+  clearOnSelect?: boolean;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -67,6 +69,7 @@ export function ProductAutocomplete({
   onSelect,
   onSelectBundle,
   placeholder = "Search products or type freely...",
+  clearOnSelect = false,
 }: ProductAutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
@@ -245,6 +248,17 @@ export function ProductAutocomplete({
     }
   }, [activeCategory, isOpen, focusSearch]);
 
+  // After a selection, optionally clear the input so the search bar
+  // is ready for the next item.
+  const afterSelect = useCallback(() => {
+    setIsOpen(false);
+    if (clearOnSelect) {
+      onChange("");
+      setSearchTerm("");
+      setActiveCategory(null);
+    }
+  }, [clearOnSelect, onChange]);
+
   // Reposition on scroll / resize while open
   useEffect(() => {
     if (!isOpen) return;
@@ -287,10 +301,10 @@ export function ProductAutocomplete({
         setActiveCategory(item.key);
       } else if (item.type === "bundle") {
         onSelectBundle?.(item.bundle);
-        setIsOpen(false);
+        afterSelect();
       } else if (item.type === "product") {
         onSelect(item.product);
-        setIsOpen(false);
+        afterSelect();
       }
     } else if (e.key === "Escape") {
       if (activeCategory) {
@@ -428,7 +442,7 @@ export function ProductAutocomplete({
                   e.preventDefault();
                   e.stopPropagation();
                   onSelectBundle?.(b);
-                  setIsOpen(false);
+                  afterSelect();
                 }}
                 onMouseEnter={() => setHighlightIndex(idx)}
                 className={`px-3 py-2.5 cursor-pointer text-sm ${
@@ -465,7 +479,7 @@ export function ProductAutocomplete({
                 e.preventDefault();
                 e.stopPropagation();
                 onSelect(p);
-                setIsOpen(false);
+                afterSelect();
               }}
               onMouseEnter={() => setHighlightIndex(idx)}
               className={`px-3 py-2 cursor-pointer text-sm flex items-center justify-between gap-2 ${

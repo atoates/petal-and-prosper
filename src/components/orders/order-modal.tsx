@@ -4,7 +4,7 @@ import React, { useId, useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Trash2, Plus, ChevronDown, ChevronUp, Package } from "lucide-react";
+import { X, Trash2, ChevronDown, ChevronUp, Package } from "lucide-react";
 import {
   ProductAutocomplete,
   type Bundle,
@@ -113,21 +113,13 @@ function deriveUnitPrice(
 function LineItemRow({
   item,
   index,
-  products,
-  bundles,
   onItemChange,
-  onProductSelect,
-  onBundleSelect,
   onRemove,
   compact,
 }: {
   item: OrderItem;
   index: number;
-  products: Product[];
-  bundles: Bundle[];
   onItemChange: (index: number, field: string, value: string | number) => void;
-  onProductSelect: (index: number, product: Product) => void;
-  onBundleSelect: (bundle: Bundle) => void;
   onRemove: (index: number) => void;
   compact?: boolean;
 }) {
@@ -144,14 +136,12 @@ function LineItemRow({
           <label className="block text-xs font-medium text-gray-700 mb-1">
             Description
           </label>
-          <ProductAutocomplete
+          <input
+            type="text"
             value={item.description}
-            products={products}
-            bundles={bundles}
-            onChange={(val) => onItemChange(index, "description", val)}
-            onSelect={(product) => onProductSelect(index, product)}
-            onSelectBundle={onBundleSelect}
-            placeholder="Search products or type freely..."
+            onChange={(e) => onItemChange(index, "description", e.target.value)}
+            placeholder="Item description"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4332] focus:border-transparent transition-colors text-sm"
           />
         </div>
 
@@ -413,51 +403,32 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
     }));
   };
 
-  const handleAddItem = () => {
+  /** Add a product from the top-level search bar as a new line item. */
+  const handleAddProduct = (product: Product) => {
+    const baseCost = product.wholesalePrice
+      ? parseFloat(product.wholesalePrice)
+      : product.retailPrice
+      ? parseFloat(product.retailPrice)
+      : 0;
+    const category = product.category || "";
+    const unitPrice =
+      baseCost > 0 ? deriveUnitPrice(baseCost, category, rules) : 0;
+    const quantity = 1;
+
     const newItem: OrderItem = {
-      id: `new-${Date.now()}`,
-      description: "",
-      category: "",
-      quantity: 1,
-      baseCost: "",
-      unitPrice: "0.00",
-      totalPrice: "0.00",
+      id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      description: product.name + (product.colour ? ` - ${product.colour}` : ""),
+      category,
+      baseCost: baseCost > 0 ? baseCost.toFixed(2) : "",
+      quantity,
+      unitPrice: unitPrice.toFixed(2),
+      totalPrice: (quantity * unitPrice).toFixed(2),
     };
 
     setFormData((prev) => ({
       ...prev,
       items: [...(prev.items || []), newItem],
     }));
-  };
-
-  const handleProductSelect = (index: number, product: Product) => {
-    const items = [...(formData.items || [])];
-    const item = items[index];
-    if (!item) return;
-
-    // Prefer wholesalePrice as the base cost -- that's what the
-    // florist actually pays. retailPrice is kept as a sensible
-    // fallback for products that only have a sell price on record.
-    const baseCost = product.wholesalePrice
-      ? parseFloat(product.wholesalePrice)
-      : product.retailPrice
-      ? parseFloat(product.retailPrice)
-      : 0;
-    const category = product.category || item.category;
-    const unitPrice =
-      baseCost > 0 ? deriveUnitPrice(baseCost, category, rules) : 0;
-    const quantity = parseFloat(String(item.quantity)) || 1;
-
-    items[index] = {
-      ...item,
-      description: product.name + (product.colour ? ` — ${product.colour}` : ""),
-      category,
-      baseCost: baseCost > 0 ? baseCost.toFixed(2) : "",
-      unitPrice: unitPrice.toFixed(2),
-      totalPrice: (quantity * unitPrice).toFixed(2),
-    };
-
-    setFormData((prev) => ({ ...prev, items }));
   };
 
   const handleBundleSelect = (bundle: Bundle) => {
@@ -656,19 +627,27 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
           </div>
 
           <div className="border-t border-gray-200 pt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-serif font-semibold text-gray-900">
+            <div className="mb-4">
+              <h3 className="text-lg font-serif font-semibold text-gray-900 mb-3">
                 Line Items
               </h3>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleAddItem}
-              >
-                <Plus size={16} className="mr-2" />
-                Add Item
-              </Button>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <ProductAutocomplete
+                    value=""
+                    products={products}
+                    bundles={bundles}
+                    onChange={() => {}}
+                    onSelect={handleAddProduct}
+                    onSelectBundle={handleBundleSelect}
+                    placeholder="Search products or bundles to add..."
+                    clearOnSelect
+                  />
+                </div>
+                <span className="text-xs text-gray-400 whitespace-nowrap">
+                  Select to add
+                </span>
+              </div>
             </div>
 
             <div className="space-y-4">
@@ -687,11 +666,7 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
                         key={item.id}
                         item={item}
                         index={index}
-                        products={products}
-                        bundles={bundles}
                         onItemChange={handleItemChange}
-                        onProductSelect={handleProductSelect}
-                        onBundleSelect={handleBundleSelect}
                         onRemove={handleRemoveItem}
                       />
                     );
@@ -800,11 +775,7 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
                               key={bi.id}
                               item={bi}
                               index={idx}
-                              products={products}
-                              bundles={bundles}
                               onItemChange={handleItemChange}
-                              onProductSelect={handleProductSelect}
-                              onBundleSelect={handleBundleSelect}
                               onRemove={handleRemoveItem}
                               compact
                             />
@@ -819,7 +790,7 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
                   rendered
                 ) : (
                   <div className="text-center py-8 text-gray-500">
-                    <p>No items added yet. Click &ldquo;Add Item&rdquo; to get started.</p>
+                    <p>No items added yet. Search for a product or bundle above to get started.</p>
                   </div>
                 );
               })()}
