@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Flower } from "lucide-react";
 
 export function Footer() {
@@ -65,14 +66,14 @@ export function Footer() {
             <h3 className="font-serif font-bold mb-6 text-white">Legal</h3>
             <ul className="space-y-3 text-sm">
               <li>
-                <a href="#" className="text-gray-300 hover:text-white transition-colors font-light">
+                <Link href="/privacy" className="text-gray-300 hover:text-white transition-colors font-light">
                   Privacy Policy
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-gray-300 hover:text-white transition-colors font-light">
+                <Link href="/terms" className="text-gray-300 hover:text-white transition-colors font-light">
                   Terms of Service
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
