@@ -94,9 +94,20 @@ export function ProductAutocomplete({
     });
   }, []);
 
-  // Keep the search input focused whenever the dropdown is open
+  // Keep the search input focused whenever the dropdown is open.
+  // We set interactingRef first so the main input's onBlur handler
+  // knows focus is transferring internally and doesn't close the
+  // dropdown.
   const focusSearch = useCallback(() => {
-    requestAnimationFrame(() => searchInputRef.current?.focus());
+    interactingRef.current = true;
+    requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+      // Clear the flag after a tick so future blur events from
+      // genuine outside clicks are handled normally.
+      requestAnimationFrame(() => {
+        interactingRef.current = false;
+      });
+    });
   }, []);
 
   // Build the category list with counts
@@ -496,15 +507,17 @@ export function ProductAutocomplete({
         }}
         onFocus={() => setIsOpen(true)}
         onBlur={() => {
-          // If the user just clicked inside the dropdown, the
-          // interactingRef flag is set -- don't close.
+          // If focus is transferring to the dropdown (either via
+          // click or programmatic focusSearch), interactingRef is
+          // already set -- don't close.
           if (interactingRef.current) return;
-          // Small delay to allow mousedown handlers to fire first
+          // Small delay to allow mousedown / focusSearch to set the
+          // flag before we check.
           setTimeout(() => {
             if (!interactingRef.current) {
               setIsOpen(false);
             }
-          }, 150);
+          }, 200);
         }}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
