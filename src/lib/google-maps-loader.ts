@@ -74,24 +74,55 @@ export function loadGoogleMaps(): Promise<void> {
 
   installAuthFailureHandler();
 
-  // Already loaded
-  if (typeof google !== "undefined" && google.maps) {
+  // Already fully loaded (constructors populated)
+  const g = (typeof google !== "undefined" ? google : undefined) as
+    | (typeof google & { maps?: { Map?: unknown; importLibrary?: (name: string) => Promise<unknown> } })
+    | undefined;
+  if (g?.maps && typeof g.maps.Map === "function") {
     return Promise.resolve();
   }
 
   if (window.__gmapsLoadPromise) return window.__gmapsLoadPromise;
 
   window.__gmapsLoadPromise = new Promise<void>((resolve, reject) => {
-    // If some other component beat us to appending the script, just
-    // wait for it rather than appending a second one.
+    const finish = async () => {
+      try {
+        // With loading=async, constructors live on libraries that
+        // must be explicitly imported. `importLibrary` returns an
+        // object whose members are also attached to `google.maps.*`
+        // for legacy access, so after these two awaits
+        // `google.maps.Map`, `google.maps.Marker`, `google.maps.Geocoder`,
+        // and `google.maps.places.Autocomplete` are all usable.
+        const gm = (google.maps as unknown as {
+          importLibrary: (name: string) => Promise<unknown>;
+        });
+        await gm.importLibrary("maps");
+        await gm.importLibrary("places");
+        resolve();
+      } catch (err) {
+        reject(
+          err instanceof Error
+            ? err
+            : new Error("Failed to import Google Maps libraries")
+        );
+      }
+    };
+
     const existing = document.querySelector<HTMLScriptElement>(
       'script[data-gmaps-loader="1"]'
     );
     if (existing) {
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () =>
-        reject(new Error("Failed to load Google Maps script"))
-      );
+      // If the script tag is already there, either it's still loading
+      // or it has finished. Either way, wait for the global to appear
+      // and then importLibrary.
+      if (typeof google !== "undefined" && google.maps) {
+        finish();
+      } else {
+        existing.addEventListener("load", finish);
+        existing.addEventListener("error", () =>
+          reject(new Error("Failed to load Google Maps script"))
+        );
+      }
       return;
     }
 
@@ -102,7 +133,7 @@ export function loadGoogleMaps(): Promise<void> {
     script.async = true;
     script.defer = true;
     script.dataset.gmapsLoader = "1";
-    script.addEventListener("load", () => resolve());
+    script.addEventListener("load", finish);
     script.addEventListener("error", () =>
       reject(new Error("Failed to load Google Maps script"))
     );

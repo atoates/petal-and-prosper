@@ -342,45 +342,67 @@ export default function LibrariesPage() {
     }
     setGeneratingImages(true);
     const toastId = toast.loading(
-      `Generating images for ${missingCount} product${missingCount === 1 ? "" : "s"}...`
+      `Generating images (0 / ${missingCount})...`
     );
+
+    let totalUpdated = 0;
+    const allErrors: Array<{ name: string; message: string }> = [];
+
     try {
-      const res = await fetch("/api/products/generate-images", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ missingOnly: true }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Image generation failed");
-      }
-      const updated: Product[] = data.updated ?? [];
-      const errors: Array<{ name: string; message: string }> = data.errors ?? [];
+      // Server processes a small batch per request (to avoid request
+      // timeouts on long-running OpenAI calls). Keep calling until it
+      // reports done=true or no further progress is made.
+      // Safety cap: don't loop forever if something goes wrong.
+      for (let i = 0; i < 50; i++) {
+        const res = await fetch("/api/products/generate-images", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ missingOnly: true }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Image generation failed");
+        }
+        const updated: Product[] = data.updated ?? [];
+        const errors: Array<{ name: string; message: string }> = data.errors ?? [];
 
-      if (updated.length > 0) {
-        setProducts((prev) =>
-          prev.map((p) => {
-            const u = updated.find((x) => x.id === p.id);
-            return u ? { ...p, imageUrl: u.imageUrl } : p;
-          })
+        if (updated.length > 0) {
+          setProducts((prev) =>
+            prev.map((p) => {
+              const u = updated.find((x) => x.id === p.id);
+              return u ? { ...p, imageUrl: u.imageUrl } : p;
+            })
+          );
+        }
+        totalUpdated += updated.length;
+        allErrors.push(...errors);
+
+        toast.loading(
+          `Generating images (${totalUpdated} / ${missingCount})...`,
+          { id: toastId }
         );
+
+        // Stop if server says done, or if no progress this round
+        // (otherwise we'd loop forever on persistent per-product errors).
+        if (data.done || (updated.length === 0 && errors.length === 0)) break;
+        if (updated.length === 0 && errors.length > 0) break;
       }
 
-      if (errors.length === 0) {
+      if (allErrors.length === 0) {
         toast.success(
-          `Generated ${updated.length} image${updated.length === 1 ? "" : "s"}`,
+          `Generated ${totalUpdated} image${totalUpdated === 1 ? "" : "s"}`,
           { id: toastId }
         );
       } else {
         toast.error(
-          `Generated ${updated.length}, ${errors.length} failed. First error: ${errors[0]?.message ?? "unknown"}`,
-          { id: toastId, duration: 8000 }
+          `Generated ${totalUpdated}, ${allErrors.length} failed. First error: ${allErrors[0]?.message ?? "unknown"}`,
+          { id: toastId, duration: 10000 }
         );
       }
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to generate images",
-        { id: toastId, duration: 8000 }
+        { id: toastId, duration: 10000 }
       );
     } finally {
       setGeneratingImages(false);

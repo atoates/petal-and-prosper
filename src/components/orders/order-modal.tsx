@@ -82,15 +82,6 @@ interface OrderModalProps {
 // dropdown, the colour map on the orders list, and the DB enum
 // can't drift from each other again (#17).
 const STATUS_OPTIONS = ORDER_STATUSES;
-const CATEGORY_OPTIONS = [
-  "flower",
-  "foliage",
-  "sundry",
-  "container",
-  "ribbon",
-  "accessory",
-];
-
 const FLOWER_CATEGORIES = new Set(["flower", "foliage"]);
 
 /**
@@ -149,13 +140,9 @@ function LineItemRow({
                 iconSize={14}
               />
             )}
-            <input
-              type="text"
-              value={item.description}
-              onChange={(e) => onItemChange(index, "description", e.target.value)}
-              placeholder="Item description"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4332] focus:border-transparent transition-colors text-sm"
-            />
+            <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 truncate">
+              {item.description || <span className="text-gray-400">—</span>}
+            </div>
           </div>
         </div>
 
@@ -163,20 +150,9 @@ function LineItemRow({
           <label className="block text-xs font-medium text-gray-700 mb-1">
             Category
           </label>
-          <select
-            value={item.category || ""}
-            onChange={(e) =>
-              onItemChange(index, "category", e.target.value)
-            }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4332] focus:border-transparent transition-colors text-sm"
-          >
-            <option value="">Select</option>
-            {CATEGORY_OPTIONS.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
+          <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 capitalize truncate">
+            {item.category || <span className="text-gray-400">—</span>}
+          </div>
         </div>
 
         <div>
@@ -201,23 +177,15 @@ function LineItemRow({
         <div>
           <label
             className="block text-xs font-medium text-gray-700 mb-1"
-            title="What you pay for one unit. Sell price is derived from this."
+            title="What you pay for one unit"
           >
             Cost
           </label>
           <div className="flex items-center gap-1">
             <span className="text-sm text-gray-500">£</span>
-            <input
-              type="number"
-              value={item.baseCost || ""}
-              onChange={(e) =>
-                onItemChange(index, "baseCost", e.target.value)
-              }
-              step="0.01"
-              min="0"
-              placeholder="0.00"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4332] focus:border-transparent transition-colors text-sm"
-            />
+            <div className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 tabular-nums">
+              {item.baseCost ? parseFloat(item.baseCost).toFixed(2) : "0.00"}
+            </div>
           </div>
         </div>
 
@@ -227,20 +195,9 @@ function LineItemRow({
           </label>
           <div className="flex items-center gap-1">
             <span className="text-sm text-gray-500">£</span>
-            <input
-              type="number"
-              value={item.unitPrice}
-              onChange={(e) =>
-                onItemChange(
-                  index,
-                  "unitPrice",
-                  e.target.value ? parseFloat(e.target.value) : 0
-                )
-              }
-              step="0.01"
-              min="0"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4332] focus:border-transparent transition-colors text-sm"
-            />
+            <div className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 tabular-nums">
+              {item.unitPrice ? parseFloat(String(item.unitPrice)).toFixed(2) : "0.00"}
+            </div>
           </div>
         </div>
 

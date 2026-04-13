@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Info, X, ImageOff } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -88,8 +89,39 @@ export function ProductImage({
   thumbnailSize = 32,
 }: ProductImageProps) {
   const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Position the popover relative to the trigger's bounding box in the
+  // viewport. Using position:fixed + a portal avoids getting clipped by
+  // an ancestor with overflow:hidden (e.g. the order modal body).
+  const updatePosition = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const popoverWidth = 288; // matches w-72
+    const viewportWidth = window.innerWidth;
+    const gap = 8;
+    let left = rect.left + rect.width / 2 - popoverWidth / 2;
+    // Keep within viewport
+    if (left < gap) left = gap;
+    if (left + popoverWidth > viewportWidth - gap) {
+      left = viewportWidth - popoverWidth - gap;
+    }
+    const top = rect.bottom + gap;
+    setCoords({ top, left });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePosition();
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [open, updatePosition]);
 
   // Close on outside click
   const handleClickOutside = useCallback((e: MouseEvent) => {
@@ -151,11 +183,13 @@ export function ProductImage({
         )}
       </button>
 
-      {/* Popover */}
-      {open && (
+      {/* Popover — rendered in a portal with fixed positioning so it
+          escapes modal clipping and overflow ancestors. */}
+      {open && coords && typeof document !== "undefined" && createPortal(
         <div
           ref={popoverRef}
-          className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+          style={{ position: "fixed", top: coords.top, left: coords.left }}
+          className="z-[9999] w-72 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Close button */}
@@ -219,7 +253,8 @@ export function ProductImage({
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </span>
   );

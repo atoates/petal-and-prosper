@@ -21,9 +21,20 @@ import { parseJsonBody } from "@/lib/validators/api";
  * Requires OPENAI_API_KEY to be set.
  */
 
+// Each OpenAI image call can take 10-30s. To avoid hitting platform
+// request timeouts (Railway, Vercel, etc.), we cap how many we generate
+// per request and let the client call repeatedly until all are done.
+const BATCH_SIZE = 3;
+
+// Let the Next.js runtime know this route is long-running.
+export const maxDuration = 300; // seconds
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const bodySchema = z.object({
   missingOnly: z.boolean().optional(),
   ids: z.array(z.string().uuid()).optional(),
+  limit: z.number().int().positive().max(20).optional(),
 });
 
 type Product = typeof products.$inferSelect;
@@ -103,7 +114,7 @@ export async function POST(request: NextRequest) {
 
   const parsed = await parseJsonBody(request, bodySchema);
   if (!parsed.success) return parsed.response;
-  const { ids, missingOnly } = parsed.data;
+  const { ids, missingOnly, limit } = parsed.data;
 
   try {
     // Pick the target products for this tenant
@@ -115,13 +126,23 @@ export async function POST(request: NextRequest) {
       whereClauses.push(isNull(products.imageUrl));
     }
 
-    const targets = await db
+    const allTargets = await db
       .select()
       .from(products)
       .where(and(...whereClauses));
 
+    const totalRemaining = allTargets.length;
+    const batchLimit = Math.min(limit ?? BATCH_SIZE, BATCH_SIZE);
+    const targets = allTargets.slice(0, batchLimit);
+    const remaining = Math.max(0, totalRemaining - targets.length);
+
     if (targets.length === 0) {
-      return NextResponse.json({ updated: [], skipped: [], errors: [] });
+      return NextResponse.json({
+        updated: [],
+        errors: [],
+        remaining: 0,
+        done: true,
+      });
     }
 
     const updated: Product[] = [];
@@ -147,7 +168,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ updated, errors });
+    return NextResponse.json({
+      updated,
+      errors,
+      remaining,
+      done: remaining === 0,
+    });
   } catch (error) {
     console.error(
       "Error generating product images:",
