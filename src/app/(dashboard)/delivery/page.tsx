@@ -6,8 +6,9 @@ import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Pencil, Plus, Trash2, Loader2 } from "lucide-react";
+import { Pencil, Plus, Trash2, Loader2, Map, Calculator } from "lucide-react";
 import { Can } from "@/components/auth/can";
+import Link from "next/link";
 
 /**
  * /delivery
@@ -469,6 +470,14 @@ export default function DeliveryPage() {
         </div>
         <div className="flex items-center gap-3">
           <Can permission="delivery:read">
+            <Link href="/delivery/route-planner">
+              <Button variant="outline" type="button">
+                <Map size={18} className="mr-2" />
+                Route Planner
+              </Button>
+            </Link>
+          </Can>
+          <Can permission="delivery:read">
             <Button
               variant="secondary"
               type="button"
@@ -587,6 +596,15 @@ export default function DeliveryPage() {
                     </td>
                     <td className="px-6 py-4 text-sm text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <Can permission="delivery:read">
+                          <Link
+                            href={`/delivery/${schedule.id}/travel-costs`}
+                            className="p-2 text-gray-600 hover:text-[#1B4332] hover:bg-gray-100 rounded"
+                            title="Travel costs"
+                          >
+                            <Calculator size={16} />
+                          </Link>
+                        </Can>
                         <Can permission="delivery:update">
                           <button
                             type="button"

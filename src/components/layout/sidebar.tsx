@@ -19,6 +19,7 @@ import {
   CreditCard,
   Library,
   BookUser,
+  Wand2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { featureFlags } from "@/lib/feature-flags";
@@ -35,6 +36,7 @@ const navigationItems = [
   { name: "Delivery", href: "/delivery", icon: Truck },
   { name: "Address Book", href: "/contacts", icon: BookUser },
   { name: "Libraries", href: "/libraries", icon: Library },
+  { name: "AI Tools", href: "/ai/scan-invoice", icon: Wand2 },
 ];
 
 const settingsItems = [

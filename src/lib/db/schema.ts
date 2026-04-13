@@ -504,6 +504,27 @@ export const deliverySchedules = pgTable(
     // same rationale.
     notes: text("notes"),
     status: deliveryStatusEnum("status").default("pending"),
+
+    // ── Travel cost calculator fields ──
+    // Setup / delivery leg
+    setupVehicles: integer("setup_vehicles").default(1),
+    setupDistanceMiles: decimal("setup_distance_miles", { precision: 7, scale: 2 }).default("0"),
+    setupStaff: integer("setup_staff").default(0),
+    setupTravelTimeMins: integer("setup_travel_time_mins").default(0),
+    setupTimeOnSiteMins: integer("setup_time_on_site_mins").default(0),
+    setupCostCalculated: decimal("setup_cost_calculated", { precision: 10, scale: 2 }).default("0"),
+    setupCostManual: decimal("setup_cost_manual", { precision: 10, scale: 2 }),
+    useManualSetupCost: boolean("use_manual_setup_cost").default(false),
+    // Collection / teardown leg
+    collectionVehicles: integer("collection_vehicles").default(0),
+    collectionDistanceMiles: decimal("collection_distance_miles", { precision: 7, scale: 2 }).default("0"),
+    collectionStaff: integer("collection_staff").default(0),
+    collectionTravelTimeMins: integer("collection_travel_time_mins").default(0),
+    collectionTimeOnSiteMins: integer("collection_time_on_site_mins").default(0),
+    collectionCostCalculated: decimal("collection_cost_calculated", { precision: 10, scale: 2 }).default("0"),
+    collectionCostManual: decimal("collection_cost_manual", { precision: 10, scale: 2 }),
+    useManualCollectionCost: boolean("use_manual_collection_cost").default(false),
+
     createdBy: text("created_by").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -527,6 +548,9 @@ export const venues = pgTable("venues", {
     .references(() => companies.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 200 }).notNull(),
   address: text("address"),
+  // Geocoded coordinates for distance/route calculations
+  lat: decimal("lat", { precision: 10, scale: 7 }),
+  lng: decimal("lng", { precision: 10, scale: 7 }),
   contactName: varchar("contact_name", { length: 200 }),
   contactPhone: varchar("contact_phone", { length: 50 }),
   notes: text("notes"),
