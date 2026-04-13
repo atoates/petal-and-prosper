@@ -237,6 +237,7 @@ export default function LibrariesPage() {
         colour: "",
         season: "",
         supplier: "",
+        imageUrl: "",
       });
       setFormErrors({});
     } catch (err) {
@@ -257,6 +258,7 @@ export default function LibrariesPage() {
       colour: "",
       season: "",
       supplier: "",
+      imageUrl: "",
     });
     setFormErrors({});
     setSubmitError(null);
@@ -525,8 +527,8 @@ export default function LibrariesPage() {
 
     // Sort
     return [...list].sort((a, b) => {
-      const av = (a as Record<string, unknown>)[sortField];
-      const bv = (b as Record<string, unknown>)[sortField];
+      const av = (a as unknown as Record<string, unknown>)[sortField];
+      const bv = (b as unknown as Record<string, unknown>)[sortField];
       const aStr = (av ?? "").toString().toLowerCase();
       const bStr = (bv ?? "").toString().toLowerCase();
       const cmp = aStr.localeCompare(bStr, undefined, { numeric: true });

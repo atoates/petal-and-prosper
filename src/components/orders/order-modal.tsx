@@ -68,6 +68,7 @@ interface Product {
   retailPrice?: string;
   colour?: string;
   unit?: string;
+  imageUrl?: string | null;
 }
 
 interface OrderModalProps {

@@ -16,7 +16,6 @@ import {
   MapPin,
   CheckSquare,
   Square,
-  Copy,
   Check,
   Smartphone,
 } from "lucide-react";
