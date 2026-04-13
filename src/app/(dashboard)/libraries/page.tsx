@@ -5,7 +5,6 @@ import { Card, CardBody, CardHeader, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, X, Upload, Package, Trash2, ChevronDown, ChevronUp, Search, Image as ImageIcon, Sparkles, Loader2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { ProductImage, ProductThumbnail } from "@/components/ui/product-image";
 import { Can } from "@/components/auth/can";
 import toast from "react-hot-toast";
@@ -326,6 +325,11 @@ export default function LibrariesPage() {
   };
 
   const [generatingImages, setGeneratingImages] = useState(false);
+  const [genProgress, setGenProgress] = useState<{
+    done: number;
+    total: number;
+    errors: number;
+  } | null>(null);
 
   const handleGenerateMissingImages = async () => {
     const missingCount = products.filter((p) => !p.imageUrl).length;
@@ -341,6 +345,7 @@ export default function LibrariesPage() {
       return;
     }
     setGeneratingImages(true);
+    setGenProgress({ done: 0, total: missingCount, errors: 0 });
     const toastId = toast.loading(
       `Generating images (0 / ${missingCount})...`
     );
@@ -377,6 +382,11 @@ export default function LibrariesPage() {
         totalUpdated += updated.length;
         allErrors.push(...errors);
 
+        setGenProgress({
+          done: totalUpdated,
+          total: missingCount,
+          errors: allErrors.length,
+        });
         toast.loading(
           `Generating images (${totalUpdated} / ${missingCount})...`,
           { id: toastId }
@@ -406,6 +416,9 @@ export default function LibrariesPage() {
       );
     } finally {
       setGeneratingImages(false);
+      // Keep the final progress banner visible for a moment so the user
+      // sees the outcome, then clear it.
+      setTimeout(() => setGenProgress(null), 5000);
     }
   };
 
@@ -638,6 +651,20 @@ export default function LibrariesPage() {
     return labels[cat] || cat;
   };
 
+  // Colour-coded pill classes per category. Kept deliberately muted so
+  // the badges read as data, not decoration.
+  const categoryPillClasses = (cat: string) => {
+    const map: Record<string, string> = {
+      flower: "bg-rose-100 text-rose-800 border-rose-200",
+      foliage: "bg-green-100 text-green-800 border-green-200",
+      sundry: "bg-amber-100 text-amber-800 border-amber-200",
+      container: "bg-slate-100 text-slate-800 border-slate-200",
+      ribbon: "bg-purple-100 text-purple-800 border-purple-200",
+      accessory: "bg-sky-100 text-sky-800 border-sky-200",
+    };
+    return map[cat] || "bg-gray-100 text-gray-700 border-gray-200";
+  };
+
   const SortIcon = ({ field }: { field: string }) => {
     if (sortField !== field) return null;
     return sortDirection === "asc" ? (
@@ -780,6 +807,51 @@ export default function LibrariesPage() {
             </CardBody>
           </Card>
 
+          {/* Image generation progress banner — stays visible for the
+              full duration of the (potentially multi-minute) batch job
+              so the user always has clear feedback. */}
+          {genProgress && (
+            <Card className="mb-4 border-dark-green/30 bg-dark-green/5">
+              <CardBody className="py-3">
+                <div className="flex items-center gap-3">
+                  {generatingImages ? (
+                    <Loader2
+                      size={18}
+                      className="animate-spin text-dark-green shrink-0"
+                    />
+                  ) : (
+                    <Sparkles size={18} className="text-dark-green shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-3 mb-1">
+                      <span className="text-sm font-medium text-gray-900">
+                        {generatingImages
+                          ? "Generating AI images..."
+                          : "Image generation complete"}
+                      </span>
+                      <span className="text-xs text-gray-600 tabular-nums shrink-0">
+                        {genProgress.done} / {genProgress.total}
+                        {genProgress.errors > 0 && (
+                          <span className="text-red-600 ml-2">
+                            ({genProgress.errors} failed)
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-dark-green transition-all duration-300"
+                        style={{
+                          width: `${genProgress.total === 0 ? 0 : Math.round((genProgress.done / genProgress.total) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+          )}
+
           {/* Quick search */}
           <div className="relative mb-4">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -881,9 +953,11 @@ export default function LibrariesPage() {
                             {product.name}
                           </td>
                           <td className="px-4 py-3">
-                            <Badge variant="secondary">
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${categoryPillClasses(product.category)}`}
+                            >
                               {categoryLabel(product.category)}
-                            </Badge>
+                            </span>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
                             {product.subcategory || "-"}
