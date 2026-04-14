@@ -12,6 +12,10 @@ import { formatUkDate } from "@/lib/format-date";
 interface DeliveryPin {
   id: string;
   address: string;
+  /** Pre-stored coordinates from the autocomplete selection. When
+   *  present the map skips the slow Geocoder call entirely. */
+  lat?: number | null;
+  lng?: number | null;
   clientName: string;
   venueName?: string;
   date?: string;
@@ -38,6 +42,7 @@ export function DeliveryMap({ deliveries }: DeliveryMapProps) {
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [unmappedCount, setUnmappedCount] = useState(0);
 
   const apiKey = getGoogleMapsApiKey();
 
@@ -51,7 +56,8 @@ export function DeliveryMap({ deliveries }: DeliveryMapProps) {
     });
   }, []);
 
-  // Geocode an address and return lat/lng
+  // Geocode an address and return lat/lng. Only used as a fallback for
+  // deliveries that were created before we started storing coordinates.
   const geocode = async (
     address: string
   ): Promise<{ lat: number; lng: number } | null> => {
@@ -62,8 +68,10 @@ export function DeliveryMap({ deliveries }: DeliveryMapProps) {
         const loc = result.results[0].geometry.location;
         return { lat: loc.lat(), lng: loc.lng() };
       }
+      console.warn(`[delivery-map] Geocode returned no results for: "${address}"`);
       return null;
-    } catch {
+    } catch (err) {
+      console.warn(`[delivery-map] Geocode failed for: "${address}"`, err);
       return null;
     }
   };
@@ -162,10 +170,15 @@ export function DeliveryMap({ deliveries }: DeliveryMapProps) {
         const bounds = new google.maps.LatLngBounds();
         let hasValidMarker = false;
 
-        // Geocode each delivery and place a marker
+        // Place a marker for each delivery. Prefer stored lat/lng
+        // (instant) and only fall back to the Geocoder for legacy
+        // deliveries that were created before coordinates were captured.
         await Promise.allSettled(
           deliveries.map(async (delivery) => {
-            const pos = await geocode(delivery.address);
+            const pos =
+              delivery.lat != null && delivery.lng != null
+                ? { lat: delivery.lat, lng: delivery.lng }
+                : await geocode(delivery.address);
             if (!pos || cancelled) return null;
 
             hasValidMarker = true;
@@ -229,6 +242,10 @@ export function DeliveryMap({ deliveries }: DeliveryMapProps) {
         );
 
         if (cancelled) return;
+
+        // Track how many deliveries couldn't be placed on the map
+        const failedCount = deliveries.length - markersRef.current.length;
+        setUnmappedCount(failedCount);
 
         // Fit map to marker bounds
         if (hasValidMarker) {
@@ -340,6 +357,12 @@ export function DeliveryMap({ deliveries }: DeliveryMapProps) {
           </div>
         )}
       </div>
+      {!loading && !error && unmappedCount > 0 && (
+        <p className="text-xs text-amber-700 mt-2">
+          {unmappedCount} delivery{unmappedCount === 1 ? " doesn't" : "s don't"} have
+          a mappable address. Edit the delivery to set a valid UK address.
+        </p>
+      )}
     </div>
   );
 }

@@ -41,13 +41,15 @@ function Thumbnail({
 }) {
   const [failed, setFailed] = useState(false);
 
+  const rounding = size >= 48 ? "rounded-lg" : "rounded";
+
   if (!src || failed) {
     return (
       <div
-        className="rounded bg-gray-100 flex items-center justify-center shrink-0"
+        className={`${rounding} bg-gray-100 flex items-center justify-center shrink-0`}
         style={{ width: size, height: size }}
       >
-        <ImageOff size={size * 0.45} className="text-gray-300" />
+        <ImageOff size={size * 0.4} className="text-gray-300" />
       </div>
     );
   }
@@ -57,7 +59,7 @@ function Thumbnail({
       src={src}
       alt={alt}
       onError={() => setFailed(true)}
-      className="rounded object-cover shrink-0"
+      className={`${rounding} object-cover shrink-0`}
       style={{ width: size, height: size }}
     />
   );

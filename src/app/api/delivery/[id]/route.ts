@@ -53,6 +53,10 @@ export async function PATCH(
     if (data.deliveryDate !== undefined) updates.deliveryDate = data.deliveryDate;
     if (data.deliveryAddress !== undefined)
       updates.deliveryAddress = data.deliveryAddress;
+    if (data.deliveryLat !== undefined)
+      updates.deliveryLat = data.deliveryLat != null ? String(data.deliveryLat) : null;
+    if (data.deliveryLng !== undefined)
+      updates.deliveryLng = data.deliveryLng != null ? String(data.deliveryLng) : null;
     if (data.venueId !== undefined) updates.venueId = data.venueId;
     if (data.driverId !== undefined) updates.driverId = data.driverId;
     if (data.timeSlot !== undefined) updates.timeSlot = data.timeSlot;

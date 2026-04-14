@@ -37,6 +37,8 @@ interface DeliverySchedule {
   orderId: string;
   deliveryDate?: string | null;
   deliveryAddress?: string | null;
+  deliveryLat?: string | null;
+  deliveryLng?: string | null;
   venueId?: string | null;
   driverId?: string | null;
   timeSlot?: string | null;
@@ -74,6 +76,8 @@ interface Venue {
   id: string;
   name: string;
   address?: string | null;
+  lat?: string | null;
+  lng?: string | null;
   contactName?: string | null;
   contactPhone?: string | null;
   notes?: string | null;
@@ -83,6 +87,8 @@ interface DeliveryForm {
   orderId: string;
   deliveryDate: string;
   deliveryAddress: string;
+  deliveryLat: number | null;
+  deliveryLng: number | null;
   venueId: string;
   driverId: string;
   timeSlot: string;
@@ -148,6 +154,8 @@ export default function DeliveryPage() {
     orderId: "",
     deliveryDate: "",
     deliveryAddress: "",
+    deliveryLat: null,
+    deliveryLng: null,
     venueId: "",
     driverId: "",
     timeSlot: "",
@@ -214,6 +222,8 @@ export default function DeliveryPage() {
       orderId: "",
       deliveryDate: "",
       deliveryAddress: "",
+      deliveryLat: null,
+      deliveryLng: null,
       venueId: "",
       driverId: "",
       timeSlot: "",
@@ -237,6 +247,8 @@ export default function DeliveryPage() {
         ? new Date(schedule.deliveryDate).toISOString().slice(0, 10)
         : "",
       deliveryAddress: schedule.deliveryAddress || "",
+      deliveryLat: schedule.deliveryLat ? parseFloat(schedule.deliveryLat) : null,
+      deliveryLng: schedule.deliveryLng ? parseFloat(schedule.deliveryLng) : null,
       venueId: schedule.venueId || "",
       driverId: schedule.driverId || "",
       timeSlot: schedule.timeSlot || "",
@@ -298,6 +310,10 @@ export default function DeliveryPage() {
       venueId,
       deliveryAddress:
         venue && venue.address ? venue.address : prev.deliveryAddress,
+      deliveryLat:
+        venue?.lat ? parseFloat(venue.lat) : prev.deliveryLat,
+      deliveryLng:
+        venue?.lng ? parseFloat(venue.lng) : prev.deliveryLng,
     }));
   };
 
@@ -322,6 +338,8 @@ export default function DeliveryPage() {
         orderId: formData.orderId,
         deliveryDate: formData.deliveryDate,
         deliveryAddress: formData.deliveryAddress,
+        deliveryLat: formData.deliveryLat,
+        deliveryLng: formData.deliveryLng,
         venueId: formData.venueId || null,
         driverId: formData.driverId || null,
         timeSlot: formData.timeSlot || null,
@@ -339,6 +357,8 @@ export default function DeliveryPage() {
         ? JSON.stringify({
             deliveryDate: payload.deliveryDate,
             deliveryAddress: payload.deliveryAddress,
+            deliveryLat: payload.deliveryLat,
+            deliveryLng: payload.deliveryLng,
             venueId: payload.venueId,
             driverId: payload.driverId,
             timeSlot: payload.timeSlot,
@@ -597,6 +617,8 @@ export default function DeliveryPage() {
             .map((s) => ({
               id: s.id,
               address: s.deliveryAddress || s.venue?.address || "",
+              lat: s.deliveryLat ? parseFloat(s.deliveryLat) : (s.venue?.lat ? parseFloat(s.venue.lat) : null),
+              lng: s.deliveryLng ? parseFloat(s.deliveryLng) : (s.venue?.lng ? parseFloat(s.venue.lng) : null),
               clientName: s.order?.enquiry?.clientName || "Unknown client",
               venueName: s.venue?.name || undefined,
               date: s.deliveryDate || undefined,
@@ -879,6 +901,14 @@ export default function DeliveryPage() {
                       setFormData((prev) => ({
                         ...prev,
                         deliveryAddress: v,
+                      }))
+                    }
+                    onPlaceSelected={(place) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        deliveryAddress: place.formattedAddress,
+                        deliveryLat: place.lat || null,
+                        deliveryLng: place.lng || null,
                       }))
                     }
                     placeholder="Start typing a UK address..."

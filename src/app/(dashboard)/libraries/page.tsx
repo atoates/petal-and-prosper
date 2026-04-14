@@ -880,7 +880,7 @@ export default function LibrariesPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-10"></th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-16"></th>
                         <th
                           className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700"
                           onClick={() => handleSort("name")}
@@ -946,7 +946,7 @@ export default function LibrariesPage() {
                               season={product.season}
                               supplier={product.supplier}
                               showThumbnail
-                              thumbnailSize={36}
+                              thumbnailSize={56}
                             />
                           </td>
                           <td className="px-4 py-3 text-sm font-medium text-gray-900">

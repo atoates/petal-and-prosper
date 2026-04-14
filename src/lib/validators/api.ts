@@ -293,6 +293,8 @@ export const deliveryBodySchema = z.object({
   orderId: requiredTrimmed("Order ID", 100),
   deliveryDate: isoDateNullable,
   deliveryAddress: optionalTrimmed(500),
+  deliveryLat: z.number().min(-90).max(90).nullable().optional(),
+  deliveryLng: z.number().min(-180).max(180).nullable().optional(),
   venueId: optionalTrimmed(100),
   driverId: optionalTrimmed(100),
   timeSlot: optionalTrimmed(50),
@@ -306,6 +308,8 @@ export const deliveryBodySchema = z.object({
 export const deliveryPatchSchema = z.object({
   deliveryDate: isoDateNullable,
   deliveryAddress: optionalTrimmed(500),
+  deliveryLat: z.number().min(-90).max(90).nullable().optional(),
+  deliveryLng: z.number().min(-180).max(180).nullable().optional(),
   venueId: optionalTrimmed(100),
   driverId: optionalTrimmed(100),
   timeSlot: optionalTrimmed(50),

@@ -75,6 +75,8 @@ export async function POST(request: NextRequest) {
           orderId: data.orderId,
           deliveryDate: data.deliveryDate,
           deliveryAddress: data.deliveryAddress,
+          deliveryLat: data.deliveryLat != null ? String(data.deliveryLat) : null,
+          deliveryLng: data.deliveryLng != null ? String(data.deliveryLng) : null,
           venueId: data.venueId,
           driverId: data.driverId,
           timeSlot: data.timeSlot,

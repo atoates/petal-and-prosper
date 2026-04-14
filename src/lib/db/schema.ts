@@ -492,6 +492,10 @@ export const deliverySchedules = pgTable(
     // confused places that needed to tell them apart.
     deliveryDate: timestamp("delivery_date"),
     deliveryAddress: text("delivery_address"),
+    // Geocoded coordinates from address autocomplete, so the delivery
+    // map can render markers without re-geocoding on every page load.
+    deliveryLat: decimal("delivery_lat", { precision: 10, scale: 7 }),
+    deliveryLng: decimal("delivery_lng", { precision: 10, scale: 7 }),
     // Optional pointer to a saved venue for quick reuse. Nullable so
     // ad-hoc addresses still work without forcing a venue record.
     // onDelete: set null means deleting a venue doesn't nuke
