@@ -357,6 +357,7 @@ export default function ProposalsPage() {
                         disabled={downloadingId === proposal.id}
                         className="inline-flex items-center justify-center p-2 rounded hover:bg-gray-200 disabled:opacity-50 transition-colors"
                         title="Download PDF"
+                        aria-label="Download proposal PDF"
                       >
                         {downloadingId === proposal.id ? (
                           <Loader2 size={18} className="animate-spin" />

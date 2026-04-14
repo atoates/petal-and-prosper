@@ -514,6 +514,7 @@ export default function EnquiriesPage() {
                               disabled={creatingOrderFor === enquiry.id}
                               className="p-1 text-gray-600 hover:text-[#1B4332] hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
                               title="Create order from this enquiry"
+                              aria-label="Create order from enquiry"
                             >
                               <FilePlus size={16} />
                             </button>
@@ -523,6 +524,7 @@ export default function EnquiriesPage() {
                           onClick={() => handleOpenModal(enquiry)}
                           className="p-1 text-gray-600 hover:text-[#1B4332] hover:bg-gray-100 rounded transition-colors"
                           title="Edit"
+                          aria-label="Edit enquiry"
                         >
                           <Edit2 size={16} />
                         </button>

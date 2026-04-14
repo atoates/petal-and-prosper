@@ -450,6 +450,7 @@ export default function ContactsPage() {
                           href={`/contacts/${contact.id}`}
                           className="p-1.5 text-gray-600 hover:text-[#1B4332] hover:bg-gray-100 rounded transition-colors"
                           title="View details"
+                          aria-label="View details"
                         >
                           <ExternalLink size={16} />
                         </Link>
@@ -459,6 +460,7 @@ export default function ContactsPage() {
                             onClick={() => handleOpenModal(contact)}
                             className="p-1.5 text-gray-600 hover:text-[#1B4332] hover:bg-gray-100 rounded transition-colors"
                             title="Edit"
+                            aria-label="Edit contact"
                           >
                             <Edit2 size={16} />
                           </button>
@@ -470,6 +472,7 @@ export default function ContactsPage() {
                             disabled={deletingId === contact.id}
                             className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Delete"
+                            aria-label="Delete contact"
                           >
                             {deletingId === contact.id ? (
                               <Loader2 size={16} className="animate-spin" />

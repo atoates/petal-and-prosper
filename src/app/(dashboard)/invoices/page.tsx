@@ -525,6 +525,7 @@ export default function InvoicesPage() {
                           disabled={downloadingId === invoice.id}
                           className="inline-flex items-center justify-center p-2 rounded hover:bg-gray-200 disabled:opacity-50 transition-colours"
                           title="Download PDF"
+                          aria-label="Download invoice PDF"
                         >
                           {downloadingId === invoice.id ? (
                             <Loader2 size={18} className="animate-spin" />
@@ -537,6 +538,7 @@ export default function InvoicesPage() {
                             onClick={() => handleOpenPaymentModal(invoice)}
                             className="inline-flex items-center justify-center p-2 rounded hover:bg-gray-200 transition-colours"
                             title="Record payment"
+                            aria-label="Record payment"
                           >
                             <CreditCard size={18} />
                           </button>

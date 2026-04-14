@@ -770,6 +770,7 @@ export default function DeliveryPage() {
                               href={`/delivery/${schedule.id}/travel-costs`}
                               className="p-2 text-gray-600 hover:text-[#1B4332] hover:bg-gray-100 rounded"
                               title="Travel costs"
+                              aria-label="View travel costs"
                             >
                               <Calculator size={16} />
                             </Link>

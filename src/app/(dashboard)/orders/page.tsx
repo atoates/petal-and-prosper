@@ -441,6 +441,7 @@ export default function OrdersPage() {
                           href={`/orders/${order.id}`}
                           className="p-1 text-gray-600 hover:text-[#1B4332] hover:bg-gray-100 rounded transition-colors"
                           title="View"
+                          aria-label="View order"
                         >
                           <ExternalLink size={16} />
                         </Link>
@@ -448,6 +449,7 @@ export default function OrdersPage() {
                           onClick={() => handleOpenModal(order)}
                           className="p-1 text-gray-600 hover:text-[#1B4332] hover:bg-gray-100 rounded transition-colors"
                           title="Edit"
+                          aria-label="Edit order"
                         >
                           <Edit2 size={16} />
                         </button>

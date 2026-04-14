@@ -401,9 +401,9 @@ export default function Home() {
                 stars: 5,
                 avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=80&q=80",
               },
-            ].map((t, idx) => (
+            ].map((t) => (
               <div
-                key={idx}
+                key={t.name}
                 className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-8 hover:bg-white/8 transition-colors"
               >
                 <div className="flex gap-1 mb-6">

@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
-import { Card, CardBody, CardHeader, CardFooter } from "@/components/ui/card";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Card, CardBody } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Plus, X, Upload, Package, Trash2, ChevronDown, ChevronUp, Search, Image as ImageIcon, Sparkles, Loader2 } from "lucide-react";
-import { ProductImage, ProductThumbnail } from "@/components/ui/product-image";
+import { Plus, Upload, Package, Trash2, ChevronDown, ChevronUp, Search, Sparkles, Loader2 } from "lucide-react";
+import { ProductImage } from "@/components/ui/product-image";
 import { Can } from "@/components/auth/can";
+import { CreateProductModal } from "@/components/libraries/create-product-modal";
+import { ImportProductsModal } from "@/components/libraries/import-products-modal";
+import { BundleModal } from "@/components/libraries/bundle-modal";
 import toast from "react-hot-toast";
 
 /* ------------------------------------------------------------------ */
@@ -44,18 +46,6 @@ interface Bundle {
   items: BundleItemShape[];
 }
 
-interface FormData {
-  name: string;
-  category: string;
-  subcategory: string;
-  wholesalePrice: string;
-  retailPrice: string;
-  colour: string;
-  season: string;
-  supplier: string;
-  imageUrl: string;
-}
-
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
@@ -68,16 +58,6 @@ const categoryMap: Record<string, string> = {
   Ribbons: "ribbon",
 };
 const categories = ["All", "Flowers", "Foliage", "Sundries", "Containers", "Ribbons"];
-const categoryOptions = ["Flowers", "Foliage", "Sundries", "Containers", "Ribbons"];
-const seasonOptions = ["Spring", "Summer", "Autumn", "Winter", "Year Round"];
-const BUNDLE_CATEGORY_OPTIONS = [
-  { value: "flower", label: "Flower" },
-  { value: "foliage", label: "Foliage" },
-  { value: "sundry", label: "Sundry" },
-  { value: "container", label: "Container" },
-  { value: "ribbon", label: "Ribbon" },
-  { value: "accessory", label: "Accessory" },
-];
 
 /* ------------------------------------------------------------------ */
 /*  Page component                                                     */
@@ -92,52 +72,13 @@ export default function LibrariesPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [formData, setFormData] = useState<FormData>({
-    name: "",
-    category: "",
-    subcategory: "",
-    wholesalePrice: "",
-    retailPrice: "",
-    colour: "",
-    season: "",
-    supplier: "",
-    imageUrl: "",
-  });
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-
-  /* ---------- CSV import state ---------- */
   const [showImportModal, setShowImportModal] = useState(false);
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [importText, setImportText] = useState<string>("");
-  const [importLoading, setImportLoading] = useState(false);
-  const [importPreview, setImportPreview] = useState<null | {
-    total: number;
-    valid: number;
-    failed: number;
-    errors: { row: number; field?: string; message: string }[];
-  }>(null);
-  const [importError, setImportError] = useState<string | null>(null);
-  const importInputRef = useRef<HTMLInputElement>(null);
 
   /* ---------- Bundles state ---------- */
   const [bundlesData, setBundlesData] = useState<Bundle[]>([]);
   const [bundlesLoading, setBundlesLoading] = useState(true);
   const [showBundleModal, setShowBundleModal] = useState(false);
   const [editingBundle, setEditingBundle] = useState<Bundle | null>(null);
-  const [bundleForm, setBundleForm] = useState<{
-    name: string;
-    description: string;
-    items: Array<{
-      key: string;
-      productId: string;
-      description: string;
-      category: string;
-      quantity: number;
-    }>;
-  }>({ name: "", description: "", items: [] });
-  const [bundleSubmitting, setBundleSubmitting] = useState(false);
   const [expandedBundle, setExpandedBundle] = useState<string | null>(null);
 
   /* ------------------------------------------------------------------ */
@@ -186,143 +127,14 @@ export default function LibrariesPage() {
       ? products.filter((p) => p.category === categoryMap[selectedCategory])
       : products;
 
-  const validateForm = (): boolean => {
-    const errors: Record<string, string> = {};
-    if (!formData.name.trim()) errors.name = "Product name is required";
-    if (!formData.category) errors.category = "Category is required";
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleFormChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (formErrors[name]) {
-      setFormErrors((prev) => ({ ...prev, [name]: "" }));
-    }
-  };
-
-  const handleCreateProduct = async () => {
-    if (!validateForm()) return;
-    setSubmitting(true);
-    setSubmitError(null);
-
+  const refreshProducts = useCallback(async () => {
     try {
-      const response = await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          category: categoryMap[formData.category] || formData.category,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to create product");
-      }
-
-      const newProduct = await response.json();
-      setProducts((prev) => [...prev, newProduct]);
-      setShowCreateModal(false);
-      setFormData({
-        name: "",
-        category: "",
-        subcategory: "",
-        wholesalePrice: "",
-        retailPrice: "",
-        colour: "",
-        season: "",
-        supplier: "",
-        imageUrl: "",
-      });
-      setFormErrors({});
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setSubmitting(false);
+      const response = await fetch("/api/products");
+      if (response.ok) setProducts(await response.json());
+    } catch {
+      // silent refresh
     }
-  };
-
-  const handleCloseModal = () => {
-    setShowCreateModal(false);
-    setFormData({
-      name: "",
-      category: "",
-      subcategory: "",
-      wholesalePrice: "",
-      retailPrice: "",
-      colour: "",
-      season: "",
-      supplier: "",
-      imageUrl: "",
-    });
-    setFormErrors({});
-    setSubmitError(null);
-  };
-
-  /* ------------------------------------------------------------------ */
-  /*  CSV import                                                         */
-  /* ------------------------------------------------------------------ */
-
-  const handleImportFileChange = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0] ?? null;
-    setImportFile(file);
-    setImportPreview(null);
-    setImportError(null);
-    if (!file) {
-      setImportText("");
-      return;
-    }
-    try {
-      const text = await file.text();
-      setImportText(text);
-    } catch (err) {
-      setImportError(err instanceof Error ? err.message : "Failed to read file");
-      setImportText("");
-    }
-  };
-
-  const runImport = async (dryRun: boolean) => {
-    if (!importText) {
-      setImportError("Pick a CSV file first");
-      return;
-    }
-    setImportLoading(true);
-    setImportError(null);
-    try {
-      const res = await fetch("/api/products/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ csv: importText, dryRun }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || data.error || "Import failed");
-      setImportPreview({
-        total: data.total,
-        valid: data.valid,
-        failed: data.failed,
-        errors: data.errors ?? [],
-      });
-      if (!dryRun) {
-        toast.success(
-          `Imported ${data.inserted} product${data.inserted === 1 ? "" : "s"}` +
-            (data.failed > 0 ? ` (${data.failed} skipped)` : "")
-        );
-        const refreshed = await fetch("/api/products");
-        if (refreshed.ok) setProducts(await refreshed.json());
-        closeImportModal();
-      }
-    } catch (err) {
-      setImportError(err instanceof Error ? err.message : "Import failed");
-    } finally {
-      setImportLoading(false);
-    }
-  };
+  }, []);
 
   const [generatingImages, setGeneratingImages] = useState(false);
   const [genProgress, setGenProgress] = useState<{
@@ -422,157 +234,23 @@ export default function LibrariesPage() {
     }
   };
 
-  const closeImportModal = () => {
-    setShowImportModal(false);
-    setImportFile(null);
-    setImportText("");
-    setImportPreview(null);
-    setImportError(null);
-    if (importInputRef.current) importInputRef.current.value = "";
-  };
-
   /* ------------------------------------------------------------------ */
   /*  Bundles helpers                                                    */
   /* ------------------------------------------------------------------ */
 
-  // Product lookup for the bundle item builder
-  const productsByCategory = useMemo(() => {
-    const map: Record<string, Product[]> = {};
-    for (const p of products) {
-      const cat = p.category || "other";
-      if (!map[cat]) map[cat] = [];
-      map[cat].push(p);
-    }
-    return map;
-  }, [products]);
-
   const openBundleModal = (bundle?: Bundle) => {
-    if (bundle) {
-      setEditingBundle(bundle);
-      setBundleForm({
-        name: bundle.name,
-        description: bundle.description || "",
-        items: bundle.items.map((bi) => ({
-          key: bi.id || `item-${Math.random().toString(36).slice(2)}`,
-          productId: bi.productId || "",
-          description: bi.description,
-          category: bi.category || "",
-          quantity: bi.quantity,
-        })),
-      });
-    } else {
-      setEditingBundle(null);
-      setBundleForm({ name: "", description: "", items: [] });
-    }
+    setEditingBundle(bundle ?? null);
     setShowBundleModal(true);
   };
 
-  const closeBundleModal = () => {
-    setShowBundleModal(false);
-    setEditingBundle(null);
-    setBundleForm({ name: "", description: "", items: [] });
-  };
-
-  const addBundleItem = () => {
-    setBundleForm((prev) => ({
-      ...prev,
-      items: [
-        ...prev.items,
-        {
-          key: `item-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          productId: "",
-          description: "",
-          category: "",
-          quantity: 1,
-        },
-      ],
-    }));
-  };
-
-  const removeBundleItem = (index: number) => {
-    setBundleForm((prev) => ({
-      ...prev,
-      items: prev.items.filter((_, i) => i !== index),
-    }));
-  };
-
-  const updateBundleItem = (index: number, field: string, value: string | number) => {
-    setBundleForm((prev) => {
-      const items = [...prev.items];
-      const item = { ...items[index], [field]: value };
-
-      // When a product is selected, auto-fill description and category
-      if (field === "productId" && typeof value === "string" && value) {
-        const prod = products.find((p) => p.id === value);
-        if (prod) {
-          item.description = prod.name + (prod.colour ? ` - ${prod.colour}` : "");
-          item.category = prod.category || "";
-        }
-      }
-
-      items[index] = item;
-      return { ...prev, items };
-    });
-  };
-
-  const handleSaveBundle = async () => {
-    if (!bundleForm.name.trim()) {
-      toast.error("Bundle name is required");
-      return;
-    }
-    if (bundleForm.items.length === 0) {
-      toast.error("Add at least one item to the bundle");
-      return;
-    }
-
-    setBundleSubmitting(true);
+  const refreshBundles = useCallback(async () => {
     try {
-      const payload = {
-        name: bundleForm.name.trim(),
-        description: bundleForm.description.trim() || null,
-        items: bundleForm.items.map((bi) => ({
-          productId: bi.productId || null,
-          description: bi.description || "Untitled item",
-          category: bi.category || null,
-          quantity: bi.quantity || 1,
-        })),
-      };
-
-      const url = editingBundle
-        ? `/api/bundles/${editingBundle.id}`
-        : "/api/bundles";
-      const method = editingBundle ? "PUT" : "POST";
-
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || "Failed to save bundle");
-      }
-
-      const saved: Bundle = await response.json();
-
-      if (editingBundle) {
-        setBundlesData((prev) =>
-          prev.map((b) => (b.id === saved.id ? saved : b))
-        );
-        toast.success("Bundle updated");
-      } else {
-        setBundlesData((prev) => [saved, ...prev]);
-        toast.success("Bundle created");
-      }
-
-      closeBundleModal();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save bundle");
-    } finally {
-      setBundleSubmitting(false);
+      const response = await fetch("/api/bundles");
+      if (response.ok) setBundlesData(await response.json());
+    } catch {
+      // silent refresh
     }
-  };
+  }, []);
 
   const handleDeleteBundle = async (bundleId: string) => {
     if (!confirm("Are you sure you want to delete this bundle?")) return;
@@ -1127,598 +805,29 @@ export default function LibrariesPage() {
         </div>
       )}
 
-      {/* ============================================================ */}
-      {/*  CREATE / EDIT BUNDLE MODAL                                   */}
-      {/* ============================================================ */}
-      {showBundleModal && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) closeBundleModal();
-          }}
-        >
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-serif font-bold text-gray-900">
-                {editingBundle ? "Edit Bundle" : "Create Bundle"}
-              </h2>
-              <button
-                onClick={closeBundleModal}
-                className="text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
+      {/* Extracted modals */}
+      <BundleModal
+        isOpen={showBundleModal}
+        bundle={editingBundle}
+        products={products}
+        onClose={() => {
+          setShowBundleModal(false);
+          setEditingBundle(null);
+        }}
+        onSaved={refreshBundles}
+      />
 
-            <div className="p-6 space-y-6">
-              {/* Name & description */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Bundle name *
-                  </label>
-                  <input
-                    type="text"
-                    value={bundleForm.name}
-                    onChange={(e) =>
-                      setBundleForm((prev) => ({
-                        ...prev,
-                        name: e.target.value,
-                      }))
-                    }
-                    placeholder="e.g. Bridal Bouquet"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4332] focus:border-transparent text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Description
-                  </label>
-                  <input
-                    type="text"
-                    value={bundleForm.description}
-                    onChange={(e) =>
-                      setBundleForm((prev) => ({
-                        ...prev,
-                        description: e.target.value,
-                      }))
-                    }
-                    placeholder="A short description of this arrangement"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4332] focus:border-transparent text-sm"
-                  />
-                </div>
-              </div>
+      <CreateProductModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={(product) => setProducts((prev) => [...prev, product])}
+      />
 
-              {/* Items builder */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900">
-                    Items ({bundleForm.items.length})
-                  </h3>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addBundleItem}
-                  >
-                    <Plus size={14} />
-                    Add item
-                  </Button>
-                </div>
-
-                {bundleForm.items.length === 0 && (
-                  <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
-                    <Package
-                      size={28}
-                      className="mx-auto text-gray-300 mb-2"
-                    />
-                    <p className="text-sm text-gray-400">
-                      Add products to this bundle
-                    </p>
-                  </div>
-                )}
-
-                <div className="space-y-3">
-                  {bundleForm.items.map((item, index) => (
-                    <div
-                      key={item.key}
-                      className="border border-gray-200 rounded-lg p-3"
-                    >
-                      <div className="grid grid-cols-12 gap-2 items-start">
-                        {/* Product selector */}
-                        <div className="col-span-5">
-                          <label className="block text-[11px] font-medium text-gray-500 mb-1 uppercase tracking-wider">
-                            Product
-                          </label>
-                          <select
-                            value={item.productId}
-                            onChange={(e) =>
-                              updateBundleItem(
-                                index,
-                                "productId",
-                                e.target.value
-                              )
-                            }
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-[#1B4332]"
-                          >
-                            <option value="">
-                              Select product (or type below)
-                            </option>
-                            {Object.entries(productsByCategory).map(
-                              ([cat, prods]) => (
-                                <optgroup
-                                  key={cat}
-                                  label={
-                                    BUNDLE_CATEGORY_OPTIONS.find(
-                                      (c) => c.value === cat
-                                    )?.label || cat
-                                  }
-                                >
-                                  {prods.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                      {p.name}
-                                      {p.colour ? ` - ${p.colour}` : ""}
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              )
-                            )}
-                          </select>
-                        </div>
-
-                        {/* Description */}
-                        <div className="col-span-3">
-                          <label className="block text-[11px] font-medium text-gray-500 mb-1 uppercase tracking-wider">
-                            Description
-                          </label>
-                          <input
-                            type="text"
-                            value={item.description}
-                            onChange={(e) =>
-                              updateBundleItem(
-                                index,
-                                "description",
-                                e.target.value
-                              )
-                            }
-                            placeholder="Item name"
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-[#1B4332]"
-                          />
-                        </div>
-
-                        {/* Category */}
-                        <div className="col-span-2">
-                          <label className="block text-[11px] font-medium text-gray-500 mb-1 uppercase tracking-wider">
-                            Category
-                          </label>
-                          <select
-                            value={item.category}
-                            onChange={(e) =>
-                              updateBundleItem(
-                                index,
-                                "category",
-                                e.target.value
-                              )
-                            }
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-[#1B4332]"
-                          >
-                            <option value="">-</option>
-                            {BUNDLE_CATEGORY_OPTIONS.map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Quantity */}
-                        <div className="col-span-1">
-                          <label className="block text-[11px] font-medium text-gray-500 mb-1 uppercase tracking-wider">
-                            Qty
-                          </label>
-                          <input
-                            type="number"
-                            value={item.quantity}
-                            onChange={(e) =>
-                              updateBundleItem(
-                                index,
-                                "quantity",
-                                parseInt(e.target.value) || 1
-                              )
-                            }
-                            min="1"
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm text-center focus:outline-none focus:ring-1 focus:ring-[#1B4332]"
-                          />
-                        </div>
-
-                        {/* Delete */}
-                        <div className="col-span-1 flex items-end justify-center pb-0.5">
-                          <button
-                            type="button"
-                            onClick={() => removeBundleItem(index)}
-                            className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors mt-5"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3 justify-end p-6 border-t border-gray-200">
-              <Button
-                variant="outline"
-                onClick={closeBundleModal}
-                disabled={bundleSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleSaveBundle}
-                disabled={bundleSubmitting}
-              >
-                {bundleSubmitting
-                  ? "Saving..."
-                  : editingBundle
-                  ? "Update Bundle"
-                  : "Create Bundle"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ============================================================ */}
-      {/*  CREATE PRODUCT MODAL                                         */}
-      {/* ============================================================ */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-2xl mx-4">
-            <CardHeader className="flex justify-between items-center border-b pb-4">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Create Product
-              </h2>
-              <button
-                onClick={handleCloseModal}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X size={20} />
-              </button>
-            </CardHeader>
-
-            <CardBody className="py-6 space-y-6">
-              {submitError && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-red-800 text-sm">{submitError}</p>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Product Name
-                    <span className="text-red-600">*</span>
-                  </label>
-                  <Input
-                    type="text"
-                    name="name"
-                    placeholder="e.g. Red Rose"
-                    value={formData.name}
-                    onChange={handleFormChange}
-                    className={formErrors.name ? "border-red-500" : ""}
-                  />
-                  {formErrors.name && (
-                    <p className="text-red-600 text-sm mt-1">
-                      {formErrors.name}
-                    </p>
-                  )}
-                </div>
-
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Category
-                    <span className="text-red-600">*</span>
-                  </label>
-                  <select
-                    name="category"
-                    value={formData.category}
-                    onChange={handleFormChange}
-                    className={`w-full px-3 py-2 border rounded-md text-gray-900 bg-white ${
-                      formErrors.category ? "border-red-500" : "border-gray-300"
-                    }`}
-                  >
-                    <option value="">Select a category</option>
-                    {categoryOptions.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                  {formErrors.category && (
-                    <p className="text-red-600 text-sm mt-1">
-                      {formErrors.category}
-                    </p>
-                  )}
-                </div>
-
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Subcategory
-                  </label>
-                  <Input
-                    type="text"
-                    name="subcategory"
-                    placeholder="e.g. Long stem"
-                    value={formData.subcategory}
-                    onChange={handleFormChange}
-                  />
-                </div>
-
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Wholesale Price
-                  </label>
-                  <Input
-                    type="number"
-                    name="wholesalePrice"
-                    placeholder="e.g. 2.50"
-                    step="0.01"
-                    value={formData.wholesalePrice}
-                    onChange={handleFormChange}
-                  />
-                </div>
-
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Retail Price
-                  </label>
-                  <Input
-                    type="number"
-                    name="retailPrice"
-                    placeholder="e.g. 5.99"
-                    step="0.01"
-                    value={formData.retailPrice}
-                    onChange={handleFormChange}
-                  />
-                </div>
-
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Colour
-                  </label>
-                  <Input
-                    type="text"
-                    name="colour"
-                    placeholder="e.g. Red"
-                    value={formData.colour}
-                    onChange={handleFormChange}
-                  />
-                </div>
-
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Season
-                  </label>
-                  <select
-                    name="season"
-                    value={formData.season}
-                    onChange={handleFormChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white"
-                  >
-                    <option value="">Select a season</option>
-                    {seasonOptions.map((season) => (
-                      <option key={season} value={season}>
-                        {season}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Supplier
-                  </label>
-                  <Input
-                    type="text"
-                    name="supplier"
-                    placeholder="e.g. ABC Flowers Ltd"
-                    value={formData.supplier}
-                    onChange={handleFormChange}
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    <span className="flex items-center gap-1.5">
-                      <ImageIcon size={14} />
-                      Image URL
-                    </span>
-                  </label>
-                  <div className="flex gap-3 items-start">
-                    <div className="flex-1">
-                      <Input
-                        type="url"
-                        name="imageUrl"
-                        placeholder="https://images.unsplash.com/..."
-                        value={formData.imageUrl}
-                        onChange={handleFormChange}
-                      />
-                      <p className="text-xs text-gray-400 mt-1">
-                        Paste a direct link to a product photo
-                      </p>
-                    </div>
-                    {formData.imageUrl && (
-                      <div className="shrink-0">
-                        <ProductThumbnail
-                          src={formData.imageUrl}
-                          alt="Preview"
-                          size={44}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </CardBody>
-
-            <CardFooter className="flex justify-end gap-3 border-t pt-4">
-              <Button
-                variant="outline"
-                onClick={handleCloseModal}
-                disabled={submitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleCreateProduct}
-                disabled={submitting}
-              >
-                {submitting ? "Creating..." : "Create Product"}
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-      )}
-
-      {/* ============================================================ */}
-      {/*  CSV IMPORT MODAL                                             */}
-      {/* ============================================================ */}
-      {showImportModal && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="import-modal-title"
-        >
-          <Card className="w-full max-w-2xl mx-4">
-            <CardHeader className="flex justify-between items-center border-b pb-4">
-              <h2
-                id="import-modal-title"
-                className="text-xl font-semibold text-gray-900"
-              >
-                Import Products from CSV
-              </h2>
-              <button
-                onClick={closeImportModal}
-                className="text-gray-500 hover:text-gray-700"
-                aria-label="Close import modal"
-              >
-                <X size={20} />
-              </button>
-            </CardHeader>
-
-            <CardBody className="py-6 space-y-4">
-              <div className="text-sm text-gray-700 space-y-2">
-                <p>
-                  Upload a CSV with the columns below. Only{" "}
-                  <code className="bg-gray-100 px-1 rounded">name</code> and{" "}
-                  <code className="bg-gray-100 px-1 rounded">category</code>{" "}
-                  are required.
-                </p>
-                <p className="text-xs text-gray-600">
-                  Header row:{" "}
-                  <code className="bg-gray-100 px-1 rounded text-[11px]">
-                    name, category, subcategory, wholesalePrice, retailPrice,
-                    unit, stemCount, colour, season, supplier, notes, isActive
-                  </code>
-                </p>
-                <p className="text-xs text-gray-600">
-                  Category accepts Flowers, Foliage, Sundries, Containers,
-                  Ribbons, Accessories.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
-                  CSV file
-                </label>
-                <input
-                  ref={importInputRef}
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={handleImportFileChange}
-                  className="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-[#1B4332] file:text-white file:cursor-pointer"
-                />
-                {importFile && (
-                  <p className="text-xs text-gray-600 mt-1">
-                    {importFile.name} ({Math.round(importFile.size / 1024)} KB)
-                  </p>
-                )}
-              </div>
-
-              {importError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-red-800 text-sm">{importError}</p>
-                </div>
-              )}
-
-              {importPreview && (
-                <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-2">
-                  <p className="text-sm font-medium text-gray-900">
-                    Preview: {importPreview.valid} of {importPreview.total} rows
-                    look good
-                    {importPreview.failed > 0 && (
-                      <span className="text-red-700">
-                        {" "}
-                        ({importPreview.failed} will be skipped)
-                      </span>
-                    )}
-                    .
-                  </p>
-                  {importPreview.errors.length > 0 && (
-                    <div className="max-h-40 overflow-y-auto text-xs text-red-800 space-y-1">
-                      {importPreview.errors.slice(0, 20).map((e, idx) => (
-                        <div key={idx}>
-                          Row {e.row}
-                          {e.field ? ` (${e.field})` : ""}: {e.message}
-                        </div>
-                      ))}
-                      {importPreview.errors.length > 20 && (
-                        <div className="italic text-gray-600">
-                          ... and {importPreview.errors.length - 20} more
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardBody>
-
-            <CardFooter className="flex justify-end gap-3 border-t pt-4">
-              <Button
-                variant="outline"
-                onClick={closeImportModal}
-                disabled={importLoading}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => runImport(true)}
-                disabled={importLoading || !importText}
-              >
-                {importLoading ? "Checking..." : "Preview"}
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => runImport(false)}
-                disabled={
-                  importLoading ||
-                  !importText ||
-                  (importPreview !== null && importPreview.valid === 0)
-                }
-              >
-                {importLoading ? "Importing..." : "Import"}
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-      )}
+      <ImportProductsModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImported={refreshProducts}
+      />
     </div>
   );
 }
