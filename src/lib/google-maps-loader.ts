@@ -74,51 +74,24 @@ export function loadGoogleMaps(): Promise<void> {
 
   installAuthFailureHandler();
 
-  // Already fully loaded (constructors populated)
-  const g = (typeof google !== "undefined" ? google : undefined) as
-    | (typeof google & { maps?: { Map?: unknown; importLibrary?: (name: string) => Promise<unknown> } })
-    | undefined;
-  if (g?.maps && typeof g.maps.Map === "function") {
+  // Already fully loaded — Map constructor is available
+  if (typeof google !== "undefined" && google.maps && google.maps.Map) {
     return Promise.resolve();
   }
 
   if (window.__gmapsLoadPromise) return window.__gmapsLoadPromise;
 
   window.__gmapsLoadPromise = new Promise<void>((resolve, reject) => {
-    const finish = async () => {
-      try {
-        // With loading=async, constructors live on libraries that
-        // must be explicitly imported. `importLibrary` returns an
-        // object whose members are also attached to `google.maps.*`
-        // for legacy access, so after these two awaits
-        // `google.maps.Map`, `google.maps.Marker`, `google.maps.Geocoder`,
-        // and `google.maps.places.Autocomplete` are all usable.
-        const gm = (google.maps as unknown as {
-          importLibrary: (name: string) => Promise<unknown>;
-        });
-        await gm.importLibrary("maps");
-        await gm.importLibrary("places");
-        resolve();
-      } catch (err) {
-        reject(
-          err instanceof Error
-            ? err
-            : new Error("Failed to import Google Maps libraries")
-        );
-      }
-    };
-
+    // If some other component beat us to appending the script, just
+    // wait for it rather than appending a second one.
     const existing = document.querySelector<HTMLScriptElement>(
       'script[data-gmaps-loader="1"]'
     );
     if (existing) {
-      // If the script tag is already there, either it's still loading
-      // or it has finished. Either way, wait for the global to appear
-      // and then importLibrary.
-      if (typeof google !== "undefined" && google.maps) {
-        finish();
+      if (typeof google !== "undefined" && google.maps && google.maps.Map) {
+        resolve();
       } else {
-        existing.addEventListener("load", finish);
+        existing.addEventListener("load", () => resolve());
         existing.addEventListener("error", () =>
           reject(new Error("Failed to load Google Maps script"))
         );
@@ -126,14 +99,22 @@ export function loadGoogleMaps(): Promise<void> {
       return;
     }
 
+    // Classic script-tag load. We do NOT use `loading=async` because
+    // that requires the newer inline bootstrap loader and
+    // `google.maps.importLibrary()` which isn't available when loading
+    // via a plain <script> tag.  With `libraries=places` in the URL,
+    // the Places library (Autocomplete, etc.) is loaded eagerly
+    // alongside the core Maps library, so `google.maps.Map`,
+    // `google.maps.places.Autocomplete`, etc. are all available
+    // immediately after the script's `load` event fires.
     const script = document.createElement("script");
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(
       key
-    )}&libraries=${GMAPS_LIBRARIES}&v=weekly&loading=async`;
+    )}&libraries=${GMAPS_LIBRARIES}&v=weekly`;
     script.async = true;
     script.defer = true;
     script.dataset.gmapsLoader = "1";
-    script.addEventListener("load", finish);
+    script.addEventListener("load", () => resolve());
     script.addEventListener("error", () =>
       reject(new Error("Failed to load Google Maps script"))
     );

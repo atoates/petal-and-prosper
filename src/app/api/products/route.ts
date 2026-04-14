@@ -19,11 +19,25 @@ export async function GET(request: NextRequest) {
       orderBy: desc(products.createdAt),
     });
 
+    // Replace heavyweight data-URI blobs with a lightweight image-
+    // endpoint URL.  The browser fetches actual pixels on demand
+    // (with caching) via GET /api/products/[id]/image, which keeps
+    // this JSON response small and fast regardless of how many
+    // products carry generated images.
+    const mapped = result.map((p) => ({
+      ...p,
+      imageUrl: p.imageUrl
+        ? p.imageUrl.startsWith("data:")
+          ? `/api/products/${p.id}/image`
+          : p.imageUrl
+        : null,
+    }));
+
     if (category) {
-      return NextResponse.json(result.filter((p) => p.category === category));
+      return NextResponse.json(mapped.filter((p) => p.category === category));
     }
 
-    return NextResponse.json(result);
+    return NextResponse.json(mapped);
   } catch (error) {
     console.error(
       "Error fetching products:",

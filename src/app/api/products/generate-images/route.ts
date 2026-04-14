@@ -145,7 +145,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const updated: Product[] = [];
+    // We return a lightweight version (no data-URI blob) so the client
+    // doesn't choke on megabytes of JSON.
+    type LightProduct = Omit<Product, "imageUrl"> & { imageUrl: string | null };
+    const updated: LightProduct[] = [];
     const errors: Array<{ id: string; name: string; message: string }> = [];
 
     // Process sequentially to avoid hitting OpenAI rate limits and to
@@ -158,7 +161,12 @@ export async function POST(request: NextRequest) {
           .set({ imageUrl: dataUri, updatedBy: ctx.userId, updatedAt: new Date() })
           .where(eq(products.id, product.id))
           .returning();
-        if (result[0]) updated.push(result[0]);
+        if (result[0]) {
+          updated.push({
+            ...result[0],
+            imageUrl: `/api/products/${result[0].id}/image`,
+          });
+        }
       } catch (err) {
         errors.push({
           id: product.id,
