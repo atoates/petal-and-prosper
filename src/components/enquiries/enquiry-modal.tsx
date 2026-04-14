@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { X, Search, Plus, UserCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { useModalA11y } from "@/hooks/use-modal-a11y";
 import { AddressAutocomplete, type PlaceSelection } from "@/components/ui/address-autocomplete";
+import { UkDateInput } from "@/components/ui/uk-date-input";
 import Link from "next/link";
 
 interface ContactOption {
@@ -656,21 +657,36 @@ export function EnquiryModal({
               </select>
             </div>
 
-            <Input
+            <UkDateInput
               label="Event Date"
               name="eventDate"
-              type="date"
               value={formData.eventDate || ""}
-              onChange={handleChange}
+              onChange={(v) =>
+                setFormData((prev) => ({ ...prev, eventDate: v || undefined }))
+              }
             />
 
-            <Input
-              label="Venue"
-              name="venueA"
-              value={formData.venueA || ""}
-              onChange={handleChange}
-              placeholder="e.g. Town Hall"
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Venue
+              </label>
+              <AddressAutocomplete
+                value={formData.venueA || ""}
+                onChange={(v) =>
+                  setFormData((prev) => ({ ...prev, venueA: v || undefined }))
+                }
+                onPlaceSelected={(place: PlaceSelection) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    venueA: place.name || place.formattedAddress,
+                    venueATown: place.town || prev.venueATown,
+                    venueAPhone: place.phone || prev.venueAPhone,
+                  }));
+                }}
+                searchType="establishment"
+                placeholder="Search UK venues..."
+              />
+            </div>
           </div>
 
           {/* ── Extra event details (collapsible) ── */}
@@ -680,12 +696,13 @@ export function EnquiryModal({
             hasContent={hasExtraEventContent}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              <Input
+              <UkDateInput
                 label="Enquiry Date"
                 name="enquiryDate"
-                type="date"
                 value={formData.enquiryDate || ""}
-                onChange={handleChange}
+                onChange={(v) =>
+                  setFormData((prev) => ({ ...prev, enquiryDate: v || undefined }))
+                }
               />
               <Input
                 label="Colour Scheme"

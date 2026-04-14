@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { InlineSelect } from "@/components/ui/inline-select";
 import { Input } from "@/components/ui/input";
+import { UkDateInput } from "@/components/ui/uk-date-input";
 import { AddressAutocomplete } from "@/components/ui/address-autocomplete";
 import { Select } from "@/components/ui/select";
 import { Pencil, Plus, Trash2, Loader2, Map, Calculator, Search, ChevronUp, ChevronDown } from "lucide-react";
@@ -845,12 +846,13 @@ export default function DeliveryPage() {
                 />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input
+                  <UkDateInput
                     label="Delivery Date"
-                    type="date"
                     name="deliveryDate"
                     value={formData.deliveryDate}
-                    onChange={handleFormChange}
+                    onChange={(v) =>
+                      setFormData((prev) => ({ ...prev, deliveryDate: v }))
+                    }
                     required
                   />
                   <Input

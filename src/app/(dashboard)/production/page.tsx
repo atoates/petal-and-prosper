@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { UkDateInput } from "@/components/ui/uk-date-input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, X, Loader2 } from "lucide-react";
 import { Can } from "@/components/auth/can";
@@ -519,19 +520,15 @@ export default function ProductionPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Production Date
-                    </label>
-                    <Input
-                      type="date"
+                    <UkDateInput
+                      label="Production Date"
                       value={formData.productionDate}
-                      onChange={(e) =>
+                      onChange={(v) =>
                         setFormData({
                           ...formData,
-                          productionDate: e.target.value,
+                          productionDate: v,
                         })
                       }
-                      className="w-full"
                     />
                   </div>
                   <div>

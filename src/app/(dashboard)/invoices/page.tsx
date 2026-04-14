@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { UkDateInput } from "@/components/ui/uk-date-input";
 import { Plus, Download, CreditCard, Loader2, Search, ChevronUp, ChevronDown } from "lucide-react";
 import { InlineSelect } from "@/components/ui/inline-select";
 import { Can } from "@/components/auth/can";
@@ -626,14 +627,13 @@ export default function InvoicesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Due Date
-                  </label>
-                  <Input
-                    type="date"
+                  <UkDateInput
+                    label="Due Date"
                     name="dueDate"
                     value={formData.dueDate}
-                    onChange={handleFormChange}
+                    onChange={(v) =>
+                      setFormData((prev) => ({ ...prev, dueDate: v }))
+                    }
                     required
                   />
                 </div>

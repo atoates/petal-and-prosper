@@ -5,6 +5,7 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
+import { UkDateInput } from "@/components/ui/uk-date-input";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
@@ -353,14 +354,10 @@ export default function RoutePlannerPage() {
         <CardBody>
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex items-center gap-3">
-              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
-                Delivery date
-              </label>
-              <input
-                type="date"
+              <UkDateInput
+                label="Delivery date"
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4332] focus:border-transparent text-sm"
+                onChange={setSelectedDate}
               />
               <span className="text-sm text-gray-500 whitespace-nowrap">
                 {daySchedules.length} delivery
