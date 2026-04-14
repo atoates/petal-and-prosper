@@ -3,19 +3,29 @@
 import { useEffect, useRef, useState } from "react";
 import { loadGoogleMaps } from "@/lib/google-maps-loader";
 
+export interface PlaceSelection {
+  /** The full formatted address returned by Google. */
+  formattedAddress: string;
+  lat: number;
+  lng: number;
+  /** The place's own name (e.g. "Hedsor House"), if different from the address. */
+  name?: string;
+  /** Extracted postal town / city from address_components. */
+  town?: string;
+  /** Formatted phone number, if available. */
+  phone?: string;
+}
+
 interface AddressAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
   /**
    * Fired when the user picks an actual place from the dropdown (as
    * opposed to free-typing). Gives you the formatted address + lat/lng
-   * so you can, for example, geocode-free fill venue lookups.
+   * plus optional name, town and phone so you can auto-fill related
+   * fields (e.g. venue town, venue phone).
    */
-  onPlaceSelected?: (place: {
-    formattedAddress: string;
-    lat: number;
-    lng: number;
-  }) => void;
+  onPlaceSelected?: (place: PlaceSelection) => void;
   placeholder?: string;
   className?: string;
   id?: string;
@@ -27,6 +37,12 @@ interface AddressAutocompleteProps {
    * to UK-only since Petal & Prosper is a UK florist business.
    */
   countries?: string[];
+  /**
+   * What type of place to search for:
+   * - "address" (default) — street addresses only
+   * - "establishment" — businesses, venues, landmarks
+   */
+  searchType?: "address" | "establishment";
 }
 
 /**
@@ -45,6 +61,7 @@ export function AddressAutocomplete({
   required,
   disabled,
   countries = ["gb"],
+  searchType = "address",
 }: AddressAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
@@ -56,23 +73,50 @@ export function AddressAutocomplete({
       .then(() => {
         if (cancelled || !inputRef.current) return;
         if (!google.maps.places) return; // Places library failed to load
+        const fields = [
+          "formatted_address",
+          "geometry",
+          "name",
+          "address_components",
+          "formatted_phone_number",
+        ];
         const ac = new google.maps.places.Autocomplete(inputRef.current, {
-          fields: ["formatted_address", "geometry"],
+          fields,
           componentRestrictions: { country: countries },
-          types: ["address"],
+          types: [searchType],
         });
         ac.addListener("place_changed", () => {
           const place = ac.getPlace();
-          const addr = place.formatted_address;
-          if (addr) {
-            onChange(addr);
-            if (place.geometry?.location && onPlaceSelected) {
-              onPlaceSelected({
-                formattedAddress: addr,
-                lat: place.geometry.location.lat(),
-                lng: place.geometry.location.lng(),
-              });
-            }
+
+          // For establishments, prefer the place name (e.g. "Hedsor House")
+          // as the input value; for addresses, use the formatted address.
+          const displayValue =
+            searchType === "establishment" && place.name
+              ? place.name
+              : place.formatted_address;
+
+          if (displayValue) {
+            onChange(displayValue);
+          }
+
+          if (onPlaceSelected) {
+            // Extract the postal town from address_components.
+            // Google returns it under "postal_town"; falling back to
+            // "locality" which is used in some regions.
+            const townComponent = place.address_components?.find((c) =>
+              c.types.includes("postal_town")
+            ) ?? place.address_components?.find((c) =>
+              c.types.includes("locality")
+            );
+
+            onPlaceSelected({
+              formattedAddress: place.formatted_address ?? displayValue ?? "",
+              lat: place.geometry?.location?.lat() ?? 0,
+              lng: place.geometry?.location?.lng() ?? 0,
+              name: place.name,
+              town: townComponent?.long_name,
+              phone: place.formatted_phone_number,
+            });
           }
         });
         autocompleteRef.current = ac;

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Search, Plus, UserCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { useModalA11y } from "@/hooks/use-modal-a11y";
+import { AddressAutocomplete, type PlaceSelection } from "@/components/ui/address-autocomplete";
 import Link from "next/link";
 
 interface ContactOption {
@@ -722,13 +723,27 @@ export function EnquiryModal({
                 Venue A
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                <Input
-                  label="Name"
-                  name="venueA"
-                  value={formData.venueA || ""}
-                  onChange={handleChange}
-                  placeholder="Venue name"
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Name
+                  </label>
+                  <AddressAutocomplete
+                    value={formData.venueA || ""}
+                    onChange={(v) =>
+                      setFormData((prev) => ({ ...prev, venueA: v || undefined }))
+                    }
+                    onPlaceSelected={(place: PlaceSelection) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        venueA: place.name || place.formattedAddress,
+                        venueATown: place.town || prev.venueATown,
+                        venueAPhone: place.phone || prev.venueAPhone,
+                      }));
+                    }}
+                    searchType="establishment"
+                    placeholder="Search UK venues..."
+                  />
+                </div>
                 <Input
                   label="Town"
                   name="venueATown"
@@ -757,13 +772,27 @@ export function EnquiryModal({
                 Venue B
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                <Input
-                  label="Name"
-                  name="venueB"
-                  value={formData.venueB || ""}
-                  onChange={handleChange}
-                  placeholder="Venue name"
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Name
+                  </label>
+                  <AddressAutocomplete
+                    value={formData.venueB || ""}
+                    onChange={(v) =>
+                      setFormData((prev) => ({ ...prev, venueB: v || undefined }))
+                    }
+                    onPlaceSelected={(place: PlaceSelection) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        venueB: place.name || place.formattedAddress,
+                        venueBTown: place.town || prev.venueBTown,
+                        venueBPhone: place.phone || prev.venueBPhone,
+                      }));
+                    }}
+                    searchType="establishment"
+                    placeholder="Search UK venues..."
+                  />
+                </div>
                 <Input
                   label="Town"
                   name="venueBTown"

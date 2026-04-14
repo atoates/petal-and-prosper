@@ -138,6 +138,14 @@ declare namespace google.maps {
       };
       name?: string;
       place_id?: string;
+      address_components?: AddressComponent[];
+      formatted_phone_number?: string;
+    }
+
+    interface AddressComponent {
+      long_name: string;
+      short_name: string;
+      types: string[];
     }
   }
 
