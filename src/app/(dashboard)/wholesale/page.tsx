@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2 } from "lucide-react";
 import { Can } from "@/components/auth/can";
+import { formatUkDate } from "@/lib/format-date";
 
 interface WholesaleLineItem {
   description: string;
@@ -108,14 +109,6 @@ export default function WholesalePage() {
     dispatched: "primary",
     received: "success",
     cancelled: "danger",
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
   };
 
   // Items are now a proper child relation (#16), so summarising
@@ -359,7 +352,7 @@ export default function WholesalePage() {
                       </Badge>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {formatDate(order.orderDate)}
+                      {formatUkDate(order.orderDate)}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {getItemsSummary(order.items)}

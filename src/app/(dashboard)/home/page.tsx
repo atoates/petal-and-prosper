@@ -17,6 +17,11 @@ import {
   Receipt,
   ShoppingCart,
 } from "lucide-react";
+import {
+  formatUkDate,
+  UK_DATE_LONG,
+  UK_DATE_WEEKDAY_SHORT,
+} from "@/lib/format-date";
 
 const WIZARD_DISMISSED_KEY = "pp.onboardingWizardDismissed";
 
@@ -84,24 +89,6 @@ interface DashboardData {
     draftOrders: DraftOrderRow[];
   };
   onboarding: OnboardingState;
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "-";
-  return new Date(value).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function formatDay(value?: string | null) {
-  if (!value) return "-";
-  return new Date(value).toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-  });
 }
 
 export default function HomePage() {
@@ -204,7 +191,7 @@ export default function HomePage() {
         id: e.id,
         href: `/enquiries/${e.id}`,
         label: e.clientName,
-        detail: [e.eventType, e.eventDate ? formatDate(e.eventDate) : null]
+        detail: [e.eventType, e.eventDate ? formatUkDate(e.eventDate) : null]
           .filter(Boolean)
           .join(" · "),
       })),
@@ -259,12 +246,7 @@ export default function HomePage() {
             : "evening"}
         </h1>
         <p className="text-sm text-gray-500 mt-1">
-          {new Date().toLocaleDateString("en-GB", {
-            weekday: "long",
-            day: "2-digit",
-            month: "long",
-            year: "numeric",
-          })}
+          {formatUkDate(new Date(), UK_DATE_LONG)}
         </p>
       </div>
 
@@ -399,7 +381,7 @@ export default function HomePage() {
                       </Link>
                     </div>
                     <span className="text-xs text-gray-400">
-                      {formatDay(p.productionDate)}
+                      {formatUkDate(p.productionDate, UK_DATE_WEEKDAY_SHORT)}
                     </span>
                   </li>
                 ))}
@@ -420,7 +402,7 @@ export default function HomePage() {
                       </Link>
                     </div>
                     <span className="text-xs text-gray-400">
-                      {formatDay(d.deliveryDate)}
+                      {formatUkDate(d.deliveryDate, UK_DATE_WEEKDAY_SHORT)}
                     </span>
                   </li>
                 ))}

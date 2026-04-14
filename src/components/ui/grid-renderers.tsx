@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { formatUkDate } from "@/lib/format-date";
 
 interface CellRendererProps {
   value: any;
@@ -58,11 +59,7 @@ export const CurrencyRenderer = (props: CellRendererProps) => {
 
 export const DateRenderer = (props: CellRendererProps) => {
   if (!props.value) return "-";
-  return new Date(props.value).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  return formatUkDate(props.value);
 };
 
 export const CategoryBadgeRenderer = (props: CellRendererProps) => {

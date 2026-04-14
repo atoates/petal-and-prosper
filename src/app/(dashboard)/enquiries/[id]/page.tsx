@@ -19,6 +19,7 @@ import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Can } from "@/components/auth/can";
 import { EnquiryModal } from "@/components/enquiries/enquiry-modal";
+import { formatUkDate } from "@/lib/format-date";
 
 // Thin shape mirroring what GET /api/enquiries/[id] returns, with
 // optionals typed as `string | undefined` so we can hand the
@@ -91,15 +92,6 @@ const orderStatusColors: Record<
   completed: "primary",
   cancelled: "danger",
 };
-
-function formatDate(value?: string | null) {
-  if (!value) return "-";
-  return new Date(value).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 function formatPrice(price?: string | null) {
   if (!price) return "-";
@@ -258,7 +250,7 @@ export default function EnquiryDetailPage() {
           </div>
           <p className="text-gray-600 mt-1">
             {enquiry.eventType || "Enquiry"}
-            {enquiry.eventDate ? ` · ${formatDate(enquiry.eventDate)}` : ""}
+            {enquiry.eventDate ? ` · ${formatUkDate(enquiry.eventDate)}` : ""}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -330,7 +322,7 @@ export default function EnquiryDetailPage() {
                   <Calendar size={14} /> Event date
                 </dt>
                 <dd className="text-gray-900 mt-1">
-                  {formatDate(enquiry.eventDate)}
+                  {formatUkDate(enquiry.eventDate)}
                 </dd>
               </div>
               <div>
@@ -363,14 +355,14 @@ export default function EnquiryDetailPage() {
               <div>
                 <dt className="text-gray-500">Created</dt>
                 <dd className="text-gray-900">
-                  {formatDate(enquiry.createdAt)}
+                  {formatUkDate(enquiry.createdAt)}
                 </dd>
               </div>
               {enquiry.updatedAt && (
                 <div>
                   <dt className="text-gray-500">Last updated</dt>
                   <dd className="text-gray-900">
-                    {formatDate(enquiry.updatedAt)}
+                    {formatUkDate(enquiry.updatedAt)}
                   </dd>
                 </div>
               )}
@@ -433,7 +425,7 @@ export default function EnquiryDetailPage() {
                         {formatPrice(order.totalPrice)}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
-                        {formatDate(order.createdAt)}
+                        {formatUkDate(order.createdAt)}
                       </td>
                       <td className="px-4 py-3 text-sm">
                         <Link

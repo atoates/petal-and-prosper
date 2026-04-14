@@ -22,6 +22,10 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import {
+  formatUkDate,
+  UK_DATE_DAY_MONTH_LONG,
+} from "@/lib/format-date";
 
 interface PublicProposalData {
   company: {
@@ -55,15 +59,6 @@ interface PublicProposalData {
     acceptedAt?: string | null;
     rejectedAt?: string | null;
   };
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return null;
-  return new Date(value).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
 }
 
 function formatPrice(value?: string | null) {
@@ -166,7 +161,12 @@ export default function PublicProposalPage() {
     );
   }
 
-  const eventDate = formatDate(data.enquiry?.eventDate);
+  const eventDateRaw = formatUkDate(
+    data.enquiry?.eventDate,
+    UK_DATE_DAY_MONTH_LONG,
+    ""
+  );
+  const eventDate = eventDateRaw || null;
   const total = formatPrice(data.order.totalPrice);
 
   return (

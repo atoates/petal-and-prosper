@@ -10,6 +10,7 @@ import {
   deliverySchedules,
 } from "@/lib/db/schema";
 import { eq, ilike, or, and, sql } from "drizzle-orm";
+import { formatUkDate } from "@/lib/format-date";
 
 interface SearchResult {
   id: string;
@@ -18,15 +19,6 @@ interface SearchResult {
   subtitle: string;
   url: string;
 }
-
-const formatDate = (date: Date | null): string => {
-  if (!date) return "";
-  return date.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-};
 
 export async function GET(request: NextRequest) {
   // Check permissions
@@ -73,7 +65,7 @@ export async function GET(request: NextRequest) {
           id: row.id,
           type: "enquiry" as const,
           title: row.clientName,
-          subtitle: `${row.eventType || "Event"}${row.eventDate ? ` - ${formatDate(row.eventDate)}` : ""}`,
+          subtitle: `${row.eventType || "Event"}${row.eventDate ? ` - ${formatUkDate(row.eventDate)}` : ""}`,
           url: "/enquiries",
         }))
       );
@@ -275,7 +267,7 @@ export async function GET(request: NextRequest) {
           id: row.id,
           type: "delivery" as const,
           title: "",
-          subtitle: `${formatDate(row.deliveryDate)} - ${row.status || "pending"}`,
+          subtitle: `${formatUkDate(row.deliveryDate, undefined, "")} - ${row.status || "pending"}`,
           url: "/delivery",
         }))
       );

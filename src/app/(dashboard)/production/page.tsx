@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, X, Loader2 } from "lucide-react";
 import { Can } from "@/components/auth/can";
+import { formatUkDate } from "@/lib/format-date";
 
 /**
  * /production
@@ -81,15 +82,6 @@ const statusColors: Record<
   in_progress: "primary",
   completed: "success",
 };
-
-function formatDate(dateString?: string | null) {
-  if (!dateString) return "-";
-  return new Date(dateString).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 function parseTasks(raw?: string | null): ProductionTask[] {
   if (!raw) return [];
@@ -421,7 +413,7 @@ export default function ProductionPage() {
                     className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
                   >
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {formatDate(schedule.productionDate)}
+                      {formatUkDate(schedule.productionDate)}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {schedule.order?.enquiry?.clientName || "Unknown"}

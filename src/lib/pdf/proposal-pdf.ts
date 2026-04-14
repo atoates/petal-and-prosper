@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatUkDate } from "@/lib/format-date";
 
 interface OrderItem {
   description: string;
@@ -60,9 +61,8 @@ export function generateProposalPdf(data: ProposalData): jsPDF {
   pdf.setTextColor(0, 0, 0);
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(10);
-  const createdDate = new Date().toLocaleDateString("en-GB");
   pdf.text(`Proposal ID: ${data.id.slice(0, 8)}`, margin, currentY);
-  pdf.text(`Date: ${createdDate}`, pageWidth - margin - 50, currentY);
+  pdf.text(`Date: ${formatUkDate(new Date())}`, pageWidth - margin - 50, currentY);
   currentY += 10;
 
   // Client details section
@@ -86,11 +86,7 @@ export function generateProposalPdf(data: ProposalData): jsPDF {
   }
 
   if (data.eventDate) {
-    const eventDateStr =
-      data.eventDate instanceof Date
-        ? data.eventDate.toLocaleDateString("en-GB")
-        : new Date(data.eventDate).toLocaleDateString("en-GB");
-    pdf.text(`Event Date: ${eventDateStr}`, margin, currentY);
+    pdf.text(`Event Date: ${formatUkDate(data.eventDate)}`, margin, currentY);
     currentY += 6;
   }
 

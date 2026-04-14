@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Can } from "@/components/auth/can";
 import { ContactModal } from "@/components/contacts/contact-modal";
+import { formatUkDate } from "@/lib/format-date";
 
 type ContactType = "customer" | "supplier" | "both";
 
@@ -93,15 +94,6 @@ const typeColour: Record<ContactType, "primary" | "warning" | "success"> = {
   supplier: "warning",
   both: "success",
 };
-
-function formatDate(dateString: string | null | undefined) {
-  if (!dateString) return "-";
-  return new Date(dateString).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 function formatCurrency(value: string | number | null | undefined) {
   if (value == null) return "-";
@@ -303,7 +295,7 @@ export default function ContactDetailPage({
         <Card>
           <CardBody className="text-center py-4">
             <p className="text-2xl font-bold text-gray-900">
-              {formatDate(contact.createdAt)}
+              {formatUkDate(contact.createdAt)}
             </p>
             <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">
               Since
@@ -497,7 +489,7 @@ export default function ContactDetailPage({
                           {enq.eventType || "General"}
                         </td>
                         <td className="px-6 py-3 text-sm text-gray-600">
-                          {formatDate(enq.eventDate)}
+                          {formatUkDate(enq.eventDate)}
                         </td>
                         <td className="px-6 py-3 text-sm">
                           <Badge
@@ -509,7 +501,7 @@ export default function ContactDetailPage({
                           </Badge>
                         </td>
                         <td className="px-6 py-3 text-sm text-gray-600">
-                          {formatDate(enq.createdAt)}
+                          {formatUkDate(enq.createdAt)}
                         </td>
                       </tr>
                     ))}
@@ -585,7 +577,7 @@ export default function ContactDetailPage({
                           {formatCurrency(order.totalPrice)}
                         </td>
                         <td className="px-6 py-3 text-sm text-gray-600">
-                          {formatDate(order.createdAt)}
+                          {formatUkDate(order.createdAt)}
                         </td>
                       </tr>
                     ))}

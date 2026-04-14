@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle } from "lucide-react";
 import { featureFlags } from "@/lib/feature-flags";
+import { formatUkDate } from "@/lib/format-date";
 
 export default function SubscriptionPage() {
   // Billing UI is a placeholder until the payments integration lands.
@@ -95,7 +96,7 @@ export default function SubscriptionPage() {
               <tbody>
                 <tr className="border-b border-gray-200 hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm text-gray-900">
-                    {new Date().toLocaleDateString("en-GB")}
+                    {formatUkDate(new Date())}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     Growth Plan - Monthly

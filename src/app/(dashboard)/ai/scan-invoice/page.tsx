@@ -6,6 +6,7 @@ import { Wand2, Upload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import type { ExtractedInvoice } from "@/lib/anthropic";
+import { formatUkDate } from "@/lib/format-date";
 
 type PageState = "upload" | "loading" | "success" | "error";
 
@@ -132,19 +133,6 @@ export default function ScanInvoicePage() {
     }).format(value);
   };
 
-  const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return "N/A";
-    try {
-      return new Date(dateString).toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      });
-    } catch {
-      return dateString;
-    }
-  };
-
   return (
     <div className="flex-1 overflow-auto">
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -262,13 +250,13 @@ export default function ScanInvoicePage() {
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Invoice Date</p>
                     <p className="text-lg font-semibold text-gray-900">
-                      {formatDate(invoiceData.invoiceDate)}
+                      {formatUkDate(invoiceData.invoiceDate, undefined, "N/A")}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Due Date</p>
                     <p className="text-lg font-semibold text-gray-900">
-                      {formatDate(invoiceData.dueDate)}
+                      {formatUkDate(invoiceData.dueDate, undefined, "N/A")}
                     </p>
                   </div>
                 </div>

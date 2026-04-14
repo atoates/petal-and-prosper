@@ -9,6 +9,7 @@ import { InlineSelect } from "@/components/ui/inline-select";
 import { Plus, Search, Edit2, Trash2, FilePlus, Archive, ArchiveRestore, Loader2, ChevronUp, ChevronDown } from "lucide-react";
 import { Can } from "@/components/auth/can";
 import { EnquiryModal } from "@/components/enquiries/enquiry-modal";
+import { formatUkDate } from "@/lib/format-date";
 
 type EnquiryView = "active" | "archived";
 
@@ -89,15 +90,6 @@ export default function EnquiriesPage() {
 
     setFilteredEnquiries(filtered);
   }, [searchTerm, selectedStatus, enquiries]);
-
-  const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -478,7 +470,7 @@ export default function EnquiriesPage() {
                       {enquiry.eventType || "-"}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {formatDate(enquiry.eventDate)}
+                      {formatUkDate(enquiry.eventDate)}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {enquiry.venueA || "-"}

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Can } from "@/components/auth/can";
 import { Card, CardBody, CardHeader, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { formatUkDateTime } from "@/lib/format-date";
 // Plus icon removed -- quote creation handled via Orders workflow
 
 interface PriceSettings {
@@ -179,13 +180,7 @@ export default function PricingPage() {
 
           {settings.updatedAt && (
             <div className="pt-4 border-t border-gray-200 text-xs text-gray-500">
-              Last updated: {new Date(settings.updatedAt).toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
+              Last updated: {formatUkDateTime(settings.updatedAt)}
             </div>
           )}
         </CardBody>

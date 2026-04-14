@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import { Card, CardBody } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
+import { formatUkDate } from "@/lib/format-date";
 
 /**
  * /delivery/[id]/travel-costs
@@ -419,16 +420,13 @@ export default function TravelCostCalculatorPage() {
     delivery.venue?.name ||
     delivery.order?.venue?.name ||
     "Unknown Venue";
-  const eventDate =
-    delivery.order?.enquiry?.eventDate || delivery.deliveryDate || "Unknown Date";
-
-  const formattedDate = eventDate
-    ? new Date(eventDate).toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-    : "Unknown Date";
+  const rawEventOrDeliveryDate =
+    delivery.order?.enquiry?.eventDate ?? delivery.deliveryDate ?? null;
+  const formattedDate = formatUkDate(
+    rawEventOrDeliveryDate,
+    undefined,
+    "Unknown Date"
+  );
 
   return (
     <div>

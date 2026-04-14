@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Plus, Download, CreditCard, Loader2, Search, ChevronUp, ChevronDown } from "lucide-react";
 import { InlineSelect } from "@/components/ui/inline-select";
 import { Can } from "@/components/auth/can";
+import { formatUkDate } from "@/lib/format-date";
 
 interface Invoice {
   id: string;
@@ -57,16 +58,6 @@ const formatPrice = (amount: string | number): string => {
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
   if (Number.isNaN(num)) return "0.00";
   return num.toFixed(2);
-};
-
-const formatDate = (dateString: string | null | undefined): string => {
-  if (!dateString) return "-";
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-  } catch {
-    return "-";
-  }
 };
 
 export default function InvoicesPage() {
@@ -524,8 +515,8 @@ export default function InvoicesPage() {
                       />
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">£{formatPrice(invoice.totalAmount)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{formatDate(invoice.dueDate)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{formatDate(invoice.paidAt)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{formatUkDate(invoice.dueDate)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{formatUkDate(invoice.paidAt)}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       <div className="flex items-center gap-2">
                         <button

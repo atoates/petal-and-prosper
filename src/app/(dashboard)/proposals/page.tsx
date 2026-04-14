@@ -7,6 +7,7 @@ import { Card, CardBody, CardHeader, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Download, Loader2, Search, ChevronUp, ChevronDown } from "lucide-react";
 import { Can } from "@/components/auth/can";
+import { formatUkDate } from "@/lib/format-date";
 
 interface Proposal {
   id: string;
@@ -30,16 +31,6 @@ interface Order {
 
 type SortField = "client" | "orderId" | "status" | "sentDate" | "created" | null;
 type SortDirection = "asc" | "desc";
-
-const formatDate = (dateString?: string) => {
-  if (!dateString) return "";
-  const date = new Date(dateString);
-  return date.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-};
 
 const statusColors: Record<string, "primary" | "secondary" | "success" | "warning" | "danger"> = {
   draft: "secondary",
@@ -355,10 +346,10 @@ export default function ProposalsPage() {
                       </Badge>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {formatDate(proposal.sentAt)}
+                      {formatUkDate(proposal.sentAt, undefined, "")}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {formatDate(proposal.createdAt)}
+                      {formatUkDate(proposal.createdAt)}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       <button

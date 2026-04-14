@@ -27,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${seriffont.variable} ${sansFont.variable}`}>
+    <html lang="en-GB" className={`${seriffont.variable} ${sansFont.variable}`}>
       <body className="bg-[#FFF8F0] font-sans">
         <AuthProvider>{children}</AuthProvider>
         <Toaster

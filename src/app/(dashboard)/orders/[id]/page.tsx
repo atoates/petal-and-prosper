@@ -11,6 +11,7 @@ import { ArrowLeft, Plus, Pencil } from "lucide-react";
 import { Can } from "@/components/auth/can";
 import { ProductImage } from "@/components/ui/product-image";
 import { OrderModal } from "@/components/orders/order-modal";
+import { formatUkDate } from "@/lib/format-date";
 
 type TabKey =
   | "enquiry"
@@ -103,15 +104,6 @@ interface InvoiceRow {
   status: string;
   totalAmount: string;
   dueDate?: string;
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "-";
-  return new Date(value).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
 }
 
 function formatPrice(value?: string | null) {
@@ -377,7 +369,7 @@ export default function OrderDetailPage() {
             {order.enquiry?.eventDate && (
               <>
                 <span>&middot;</span>
-                <span>{formatDate(order.enquiry.eventDate)}</span>
+                <span>{formatUkDate(order.enquiry.eventDate)}</span>
               </>
             )}
           </div>
@@ -451,7 +443,7 @@ export default function OrderDetailPage() {
                 <div>
                   <dt className="text-gray-500">Event date</dt>
                   <dd className="text-gray-900">
-                    {formatDate(order.enquiry.eventDate)}
+                    {formatUkDate(order.enquiry.eventDate)}
                   </dd>
                 </div>
                 <div>
@@ -716,12 +708,12 @@ export default function OrderDetailPage() {
                           {p.subject || `Proposal ${p.id.slice(0, 8)}`}
                         </div>
                         <div className="text-xs text-gray-500">
-                          Created {formatDate(p.createdAt)}
-                          {p.sentAt && ` · Sent ${formatDate(p.sentAt)}`}
+                          Created {formatUkDate(p.createdAt)}
+                          {p.sentAt && ` · Sent ${formatUkDate(p.sentAt)}`}
                           {p.acceptedAt &&
-                            ` · Accepted ${formatDate(p.acceptedAt)}`}
+                            ` · Accepted ${formatUkDate(p.acceptedAt)}`}
                           {p.rejectedAt &&
-                            ` · Declined ${formatDate(p.rejectedAt)}`}
+                            ` · Declined ${formatUkDate(p.rejectedAt)}`}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -786,7 +778,7 @@ export default function OrderDetailPage() {
                         {w.supplier}
                       </div>
                       <div className="text-xs text-gray-500">
-                        Ordered {formatDate(w.orderDate)}
+                        Ordered {formatUkDate(w.orderDate)}
                       </div>
                     </div>
                     <Badge variant="primary">{w.status}</Badge>
@@ -829,7 +821,7 @@ export default function OrderDetailPage() {
                   >
                     <div>
                       <div className="text-gray-900 font-medium">
-                        Scheduled for {formatDate(p.productionDate)}
+                        Scheduled for {formatUkDate(p.productionDate)}
                       </div>
                       {p.notes && (
                         <div className="text-xs text-gray-500">{p.notes}</div>
@@ -875,7 +867,7 @@ export default function OrderDetailPage() {
                   >
                     <div>
                       <div className="text-gray-900 font-medium">
-                        {formatDate(d.deliveryDate)}
+                        {formatUkDate(d.deliveryDate)}
                       </div>
                       {d.deliveryAddress && (
                         <div className="text-xs text-gray-500">
@@ -929,7 +921,7 @@ export default function OrderDetailPage() {
                         {inv.invoiceNumber}
                       </div>
                       <div className="text-xs text-gray-500">
-                        Due {formatDate(inv.dueDate)}
+                        Due {formatUkDate(inv.dueDate)}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">

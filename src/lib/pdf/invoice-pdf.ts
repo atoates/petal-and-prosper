@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatUkDate } from "@/lib/format-date";
 
 interface OrderItem {
   description: string;
@@ -79,16 +80,11 @@ export function generateInvoicePdf(data: InvoiceData): jsPDF {
     currentY += 6;
   }
 
-  const createdDate = new Date().toLocaleDateString("en-GB");
-  pdf.text(`Date: ${createdDate}`, margin, currentY);
+  pdf.text(`Date: ${formatUkDate(new Date())}`, margin, currentY);
   currentY += 6;
 
   if (data.dueDate) {
-    const dueDateStr =
-      data.dueDate instanceof Date
-        ? data.dueDate.toLocaleDateString("en-GB")
-        : new Date(data.dueDate).toLocaleDateString("en-GB");
-    pdf.text(`Due Date: ${dueDateStr}`, margin, currentY);
+    pdf.text(`Due Date: ${formatUkDate(data.dueDate)}`, margin, currentY);
     currentY += 6;
   }
 
@@ -128,11 +124,7 @@ export function generateInvoicePdf(data: InvoiceData): jsPDF {
   }
 
   if (data.eventDate) {
-    const eventDateStr =
-      data.eventDate instanceof Date
-        ? data.eventDate.toLocaleDateString("en-GB")
-        : new Date(data.eventDate).toLocaleDateString("en-GB");
-    pdf.text(`Event Date: ${eventDateStr}`, margin, currentY);
+    pdf.text(`Event Date: ${formatUkDate(data.eventDate)}`, margin, currentY);
     currentY += 6;
   }
 

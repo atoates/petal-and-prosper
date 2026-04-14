@@ -7,6 +7,7 @@ import {
   getGoogleMapsApiKey,
   onGoogleMapsAuthFailure,
 } from "@/lib/google-maps-loader";
+import { formatUkDate } from "@/lib/format-date";
 
 interface DeliveryPin {
   id: string;
@@ -185,13 +186,7 @@ export function DeliveryMap({ deliveries }: DeliveryMapProps) {
             });
 
             // Info window content
-            const dateStr = delivery.date
-              ? new Date(delivery.date).toLocaleDateString("en-GB", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                })
-              : "";
+            const dateStr = delivery.date ? formatUkDate(delivery.date, undefined, "") : "";
 
             const content = `
               <div style="font-family: system-ui, sans-serif; min-width: 200px; max-width: 280px;">

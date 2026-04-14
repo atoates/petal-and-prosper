@@ -12,6 +12,7 @@ import { Pencil, Plus, Trash2, Loader2, Map, Calculator, Search, ChevronUp, Chev
 import { Can } from "@/components/auth/can";
 import Link from "next/link";
 import { DeliveryMap } from "@/components/delivery/delivery-map";
+import { formatUkDate } from "@/lib/format-date";
 
 /**
  * /delivery
@@ -95,15 +96,6 @@ const statusOptions = [
   { value: "dispatched", label: "Dispatched" },
   { value: "delivered", label: "Delivered" },
 ];
-
-function formatDate(dateString?: string | null) {
-  if (!dateString) return "-";
-  return new Date(dateString).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 function driverLabel(members: TeamMember[], id?: string | null): string {
   if (!id) return "Unassigned";
@@ -698,7 +690,7 @@ export default function DeliveryPage() {
                       className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
                     >
                       <td className="px-6 py-4 text-sm text-gray-900">
-                        {formatDate(schedule.deliveryDate)}
+                        {formatUkDate(schedule.deliveryDate)}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
                         {schedule.timeSlot || "-"}

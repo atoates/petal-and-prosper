@@ -9,6 +9,7 @@ import { Plus, Edit2, Trash2, ExternalLink, Loader2, Search, ChevronUp, ChevronD
 import Link from "next/link";
 import { OrderModal } from "@/components/orders/order-modal";
 import { Can } from "@/components/auth/can";
+import { formatUkDate } from "@/lib/format-date";
 import type { OrderStatus } from "@/types/orders";
 
 interface Order {
@@ -84,14 +85,6 @@ export default function OrdersPage() {
   }, []);
 
   // Status pill styling is now handled inline via InlineSelect options.
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
 
   const formatPrice = (price?: string) => {
     if (!price) return "-";
@@ -414,7 +407,7 @@ export default function OrdersPage() {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {order.enquiry?.eventDate
-                        ? formatDate(order.enquiry.eventDate)
+                        ? formatUkDate(order.enquiry.eventDate)
                         : "-"}
                     </td>
                     <td className="px-6 py-4 text-sm">
@@ -440,7 +433,7 @@ export default function OrdersPage() {
                       {formatPrice(order.totalPrice)}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {formatDate(order.createdAt)}
+                      {formatUkDate(order.createdAt)}
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <div className="flex items-center gap-2">
