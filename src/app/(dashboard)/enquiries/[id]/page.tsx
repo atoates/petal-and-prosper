@@ -70,28 +70,10 @@ interface LinkedOrder {
   createdAt: string;
 }
 
-const statusColors: Record<
-  string,
-  "primary" | "success" | "warning" | "danger" | "secondary"
-> = {
-  New: "warning",
-  TBD: "secondary",
-  Live: "success",
-  Done: "primary",
-  Placed: "primary",
-  Order: "success",
-};
-
-const orderStatusColors: Record<
-  string,
-  "primary" | "success" | "warning" | "danger" | "secondary"
-> = {
-  draft: "secondary",
-  quote: "warning",
-  confirmed: "success",
-  completed: "primary",
-  cancelled: "danger",
-};
+import {
+  enquiryProgressColours as statusColors,
+  orderStatusColours as orderStatusColors,
+} from "@/lib/status-colours";
 
 function formatPrice(price?: string | null) {
   if (!price) return "-";

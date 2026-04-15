@@ -2,35 +2,33 @@
 
 import { Badge } from "@/components/ui/badge";
 import { formatUkDate } from "@/lib/format-date";
+import {
+  enquiryProgressColours,
+  orderStatusColours,
+  proposalStatusColours,
+  invoiceStatusColours,
+  productionStatusColours,
+  deliveryStatusColours,
+  wholesaleStatusColours,
+} from "@/lib/status-colours";
 
 interface CellRendererProps {
-  value: any;
-  data?: any;
+  value: string | number | null | undefined;
+  data?: Record<string, unknown>;
 }
 
+// Merge all entity status maps so the generic renderer handles any status
+const statusColors = {
+  ...enquiryProgressColours,
+  ...orderStatusColours,
+  ...proposalStatusColours,
+  ...invoiceStatusColours,
+  ...productionStatusColours,
+  ...deliveryStatusColours,
+  ...wholesaleStatusColours,
+};
+
 export const StatusBadgeRenderer = (props: CellRendererProps) => {
-  const statusColors: Record<
-    string,
-    "primary" | "success" | "warning" | "danger" | "secondary"
-  > = {
-    draft: "secondary",
-    sent: "primary",
-    accepted: "success",
-    rejected: "danger",
-    expired: "danger",
-    pending: "warning",
-    confirmed: "success",
-    completed: "primary",
-    cancelled: "danger",
-    paid: "success",
-    overdue: "danger",
-    New: "warning",
-    TBD: "secondary",
-    Live: "success",
-    Done: "primary",
-    Placed: "primary",
-    Order: "success",
-  };
 
   const value = props.value || "";
   const displayValue = typeof value === "string"
@@ -49,8 +47,8 @@ export const StatusBadgeRenderer = (props: CellRendererProps) => {
 };
 
 export const CurrencyRenderer = (props: CellRendererProps) => {
-  if (!props.value) return "-";
-  const formatted = parseFloat(props.value).toLocaleString("en-GB", {
+  if (!props.value && props.value !== 0) return "-";
+  const formatted = parseFloat(String(props.value)).toLocaleString("en-GB", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -59,7 +57,7 @@ export const CurrencyRenderer = (props: CellRendererProps) => {
 
 export const DateRenderer = (props: CellRendererProps) => {
   if (!props.value) return "-";
-  return formatUkDate(props.value);
+  return formatUkDate(String(props.value));
 };
 
 export const CategoryBadgeRenderer = (props: CellRendererProps) => {
@@ -76,7 +74,7 @@ export const CategoryBadgeRenderer = (props: CellRendererProps) => {
     ribbon: "bg-purple-100 text-purple-800",
     accessory: "bg-gray-100 text-gray-800",
   };
-  const val = props.value.toLowerCase();
+  const val = String(props.value).toLowerCase();
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colours[val] || "bg-blue-100 text-blue-800"}`}>
       {displayNames[val] || props.value}

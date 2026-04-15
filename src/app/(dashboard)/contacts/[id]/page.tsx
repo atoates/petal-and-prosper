@@ -72,22 +72,12 @@ interface Contact {
   updatedAt?: string | null;
 }
 
-const statusColours: Record<
-  string,
-  "primary" | "success" | "warning" | "danger" | "secondary"
-> = {
-  New: "warning",
-  TBD: "secondary",
-  Live: "success",
-  Done: "primary",
-  Placed: "primary",
-  Order: "success",
-  draft: "secondary",
-  quote: "warning",
-  confirmed: "success",
-  cancelled: "danger",
-  completed: "primary",
-};
+import {
+  enquiryProgressColours,
+  orderStatusColours,
+} from "@/lib/status-colours";
+
+const statusColours = { ...enquiryProgressColours, ...orderStatusColours };
 
 const typeColour: Record<ContactType, "primary" | "warning" | "success"> = {
   customer: "primary",

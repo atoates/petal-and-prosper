@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2 } from "lucide-react";
 import { Can } from "@/components/auth/can";
 import { formatUkDate } from "@/lib/format-date";
+import { wholesaleStatusColours } from "@/lib/status-colours";
 
 interface WholesaleLineItem {
   description: string;
@@ -103,13 +104,8 @@ export default function WholesalePage() {
     fetchOrders();
   }, []);
 
-  const statusColors: Record<string, "primary" | "success" | "warning" | "danger" | "secondary"> = {
-    pending: "warning",
-    confirmed: "primary",
-    dispatched: "primary",
-    received: "success",
-    cancelled: "danger",
-  };
+  // Using centralised status colours
+  const statusColors = wholesaleStatusColours;
 
   // Items are now a proper child relation (#16), so summarising
   // is just `items.length` rather than parsing a JSON text column.
@@ -130,7 +126,7 @@ export default function WholesalePage() {
       setOrderOptionsLoading(true);
       const [ordersRes, productsRes] = await Promise.all([
         fetch("/api/orders"),
-        fetch("/api/products"),
+        fetch("/api/products?limit=200"),
       ]);
       if (!ordersRes.ok) throw new Error("Failed to load orders");
       const data = await ordersRes.json();
@@ -139,7 +135,8 @@ export default function WholesalePage() {
       // yet, or the caller lacks products:read, we just silently skip
       // the autocomplete rather than blocking the wholesale flow.
       if (productsRes.ok) {
-        const products = await productsRes.json();
+        const json = await productsRes.json();
+        const products = json.data ?? json;
         setProductLibrary(Array.isArray(products) ? products : []);
       }
     } catch (err) {

@@ -943,7 +943,7 @@ export default function OrderDetailPage() {
           order={{
             id: order.id,
             enquiryId: order.enquiryId,
-            status: order.status as any,
+            status: order.status as "draft" | "quote" | "confirmed" | "cancelled" | "completed",
             version: order.version ?? 1,
             totalPrice: order.totalPrice,
             items: order.items?.map((i) => ({

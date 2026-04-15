@@ -258,9 +258,10 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
 
     const fetchProducts = async () => {
       try {
-        const response = await fetch("/api/products");
+        const response = await fetch("/api/products?limit=200");
         if (response.ok) {
-          const data = await response.json();
+          const json = await response.json();
+          const data: Product[] = json.data ?? json;
           setProducts(data.filter((p: Product) => p.category));
         }
       } catch {
@@ -342,9 +343,7 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
     value: string | number
   ) => {
     const items = [...(formData.items || [])];
-    const item = items[index] as any;
-
-    item[field] = value;
+    const item = { ...items[index], [field]: value } as OrderItem;
 
     // When the user types a base cost, auto-derive the marked-up unit
     // price using the tenant's rules (same calculation the server will
@@ -352,9 +351,9 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
     // manual override and clear baseCost so the next save doesn't
     // silently re-apply markup on top.
     if (field === "baseCost" || field === "category" || field === "quantity") {
-      const baseCost = parseFloat(item.baseCost);
+      const baseCost = parseFloat(item.baseCost ?? "");
       if (Number.isFinite(baseCost) && baseCost > 0) {
-        const unitPrice = deriveUnitPrice(baseCost, item.category, rules);
+        const unitPrice = deriveUnitPrice(baseCost, item.category ?? "", rules);
         item.unitPrice = unitPrice.toFixed(2);
       }
     }
@@ -364,9 +363,10 @@ export function OrderModal({ isOpen, order, onClose, onSave }: OrderModalProps) 
       item.baseCost = "";
     }
 
-    const quantity = parseFloat(item.quantity) || 0;
-    const unitPrice = parseFloat(item.unitPrice) || 0;
+    const quantity = parseFloat(String(item.quantity)) || 0;
+    const unitPrice = parseFloat(String(item.unitPrice)) || 0;
     item.totalPrice = (quantity * unitPrice).toFixed(2);
+    items[index] = item;
 
     setFormData((prev) => ({
       ...prev,

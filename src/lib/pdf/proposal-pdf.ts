@@ -2,6 +2,10 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatUkDate } from "@/lib/format-date";
 
+interface JsPDFWithAutoTable extends jsPDF {
+  lastAutoTable?: { finalY: number };
+}
+
 interface OrderItem {
   description: string;
   quantity: number;
@@ -131,7 +135,7 @@ export function generateProposalPdf(data: ProposalData): jsPDF {
     },
   });
 
-  currentY = (pdf as any).lastAutoTable.finalY + 10;
+  currentY = (pdf as JsPDFWithAutoTable).lastAutoTable?.finalY ?? 0 + 10;
 
   // Totals section
   const totalX = pageWidth - margin - 50;

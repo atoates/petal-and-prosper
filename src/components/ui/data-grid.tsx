@@ -1,15 +1,15 @@
 "use client";
 
 import { AgGridReact } from "ag-grid-react";
-import { ColDef, GridApi, GridReadyEvent } from "ag-grid-community";
+import { ColDef, GridApi, GridReadyEvent, RowClickedEvent } from "ag-grid-community";
 import { useRef, useEffect, useState } from "react";
 import "ag-grid-community/styles/ag-grid.css";
 import "@/styles/ag-grid-theme.css";
 
 interface DataGridProps {
-  rowData: any[];
+  rowData: Record<string, unknown>[];
   columnDefs: ColDef[];
-  onRowClicked?: (event: any) => void;
+  onRowClicked?: (event: RowClickedEvent) => void;
   loading?: boolean;
   emptyMessage?: string;
   pageSize?: number;
@@ -49,7 +49,7 @@ export const DataGrid = ({
     event.api.sizeColumnsToFit();
   };
 
-  const handleFirstDataRendered = (_event: any) => {
+  const handleFirstDataRendered = () => {
     if (apiRef.current) {
       apiRef.current.sizeColumnsToFit();
     }

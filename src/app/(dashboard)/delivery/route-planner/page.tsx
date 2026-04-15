@@ -79,15 +79,7 @@ interface OptimisedRouteResult {
   mapUrl: string;
 }
 
-const statusColors: Record<
-  string,
-  "primary" | "success" | "warning" | "danger" | "secondary"
-> = {
-  pending: "warning",
-  ready: "primary",
-  dispatched: "primary",
-  delivered: "success",
-};
+import { deliveryStatusColours as statusColors } from "@/lib/status-colours";
 
 function formatDateForInput(date: Date): string {
   return date.toISOString().slice(0, 10);

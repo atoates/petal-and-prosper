@@ -75,14 +75,7 @@ const STATUS_OPTIONS = [
   { value: "completed", label: "Completed" },
 ] as const;
 
-const statusColors: Record<
-  string,
-  "primary" | "success" | "warning" | "danger" | "secondary"
-> = {
-  not_started: "secondary",
-  in_progress: "primary",
-  completed: "success",
-};
+import { productionStatusColours as statusColors } from "@/lib/status-colours";
 
 function parseTasks(raw?: string | null): ProductionTask[] {
   if (!raw) return [];

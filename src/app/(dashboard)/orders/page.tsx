@@ -223,8 +223,8 @@ export default function OrdersPage() {
     }
 
     const sorted = [...filtered].sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
+      let aValue: string | number | null;
+      let bValue: string | number | null;
 
       switch (sortField) {
         case "client":

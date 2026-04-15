@@ -16,7 +16,10 @@ const sansFont = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Petal & Prosper | Floristry Business Management",
+  title: {
+    default: "Petal & Prosper | Floristry Business Management",
+    template: "%s -- Petal & Prosper",
+  },
   description:
     "Simple and powerful floristry business management software. Manage enquiries, orders, proposals, invoices, and more.",
 };

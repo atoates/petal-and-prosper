@@ -32,12 +32,8 @@ interface Order {
 type SortField = "client" | "orderId" | "status" | "sentDate" | "created" | null;
 type SortDirection = "asc" | "desc";
 
-const statusColors: Record<string, "primary" | "secondary" | "success" | "warning" | "danger"> = {
-  draft: "secondary",
-  sent: "warning",
-  accepted: "success",
-  declined: "danger",
-};
+// Status colours from centralised utility
+import { proposalStatusColours as statusColors } from "@/lib/status-colours";
 
 export default function ProposalsPage() {
   const [proposals, setProposals] = useState<Proposal[]>([]);

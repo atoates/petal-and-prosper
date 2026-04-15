@@ -89,10 +89,10 @@ export default function LibrariesPage() {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const response = await fetch("/api/products");
+        const response = await fetch("/api/products?limit=200");
         if (!response.ok) throw new Error("Failed to fetch products");
-        const data = await response.json();
-        setProducts(data);
+        const json = await response.json();
+        setProducts(json.data ?? json);
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
@@ -127,10 +127,37 @@ export default function LibrariesPage() {
       ? products.filter((p) => p.category === categoryMap[selectedCategory])
       : products;
 
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+
+  const handleDeleteProduct = async (product: Product) => {
+    if (!confirm(`Delete "${product.name}"? This cannot be undone.`)) return;
+    setDeletingProductId(product.id);
+    try {
+      const res = await fetch(`/api/products/${product.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to delete product");
+      }
+      setProducts((prev) => prev.filter((p) => p.id !== product.id));
+      toast.success(`${product.name} deleted`);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete product"
+      );
+    } finally {
+      setDeletingProductId(null);
+    }
+  };
+
   const refreshProducts = useCallback(async () => {
     try {
-      const response = await fetch("/api/products");
-      if (response.ok) setProducts(await response.json());
+      const response = await fetch("/api/products?limit=200");
+      if (response.ok) {
+        const json = await response.json();
+        setProducts(json.data ?? json);
+      }
     } catch {
       // silent refresh
     }
@@ -607,6 +634,9 @@ export default function LibrariesPage() {
                         >
                           Supplier <SortIcon field="supplier" />
                         </th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider w-20">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -654,6 +684,26 @@ export default function LibrariesPage() {
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
                             {product.supplier || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <Can permission="products:delete">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteProduct(product)}
+                                  disabled={deletingProductId === product.id}
+                                  className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                                  title="Delete product"
+                                  aria-label={`Delete ${product.name}`}
+                                >
+                                  {deletingProductId === product.id ? (
+                                    <Loader2 size={14} className="animate-spin" />
+                                  ) : (
+                                    <Trash2 size={14} />
+                                  )}
+                                </button>
+                              </div>
+                            </Can>
                           </td>
                         </tr>
                       ))}
