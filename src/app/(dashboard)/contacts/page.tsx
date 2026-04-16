@@ -255,13 +255,14 @@ export default function ContactsPage() {
               />
             </div>
 
-            <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden self-start sm:self-auto">
+            <div role="tablist" aria-label="Contact types" className="inline-flex rounded-lg border border-gray-300 overflow-hidden self-start sm:self-auto">
               {tabs.map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
+                  role="tab"
                   onClick={() => setActiveTab(tab.key)}
-                  aria-pressed={activeTab === tab.key}
+                  aria-selected={activeTab === tab.key}
                   className={`px-4 py-2 text-sm font-medium transition-colors ${
                     activeTab === tab.key
                       ? "bg-[#1B4332] text-white"

@@ -176,10 +176,12 @@ export default function SettingsPage() {
       <div className="flex flex-col sm:flex-row gap-6">
         {/* Tabs */}
         <div className="sm:w-48 flex-shrink-0">
-          <nav className="flex sm:block gap-1 sm:gap-0 sm:space-y-1 overflow-x-auto">
+          <nav role="tablist" aria-label="Settings sections" className="flex sm:block gap-1 sm:gap-0 sm:space-y-1 overflow-x-auto">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
+                role="tab"
+                aria-selected={activeTab === tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex-shrink-0 sm:w-full text-left px-4 py-2 rounded-lg transition-colors whitespace-nowrap ${
                   activeTab === tab.id

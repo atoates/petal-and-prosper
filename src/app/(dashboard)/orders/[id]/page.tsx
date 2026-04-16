@@ -386,10 +386,12 @@ export default function OrderDetailPage() {
 
       {/* Tabs */}
       <div className="border-b border-gray-200 mb-6">
-        <nav className="flex gap-2 overflow-x-auto">
+        <nav role="tablist" aria-label="Order sections" className="flex gap-2 overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.key}
+              role="tab"
+              aria-selected={activeTab === tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.key

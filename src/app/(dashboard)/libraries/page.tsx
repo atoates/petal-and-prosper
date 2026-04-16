@@ -459,8 +459,10 @@ export default function LibrariesPage() {
       )}
 
       {/* Tab switcher */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
+      <div role="tablist" aria-label="Library sections" className="flex gap-1 mb-6 border-b border-gray-200">
         <button
+          role="tab"
+          aria-selected={activeTab === "products"}
           onClick={() => setActiveTab("products")}
           className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
             activeTab === "products"
@@ -470,10 +472,12 @@ export default function LibrariesPage() {
         >
           Products
           <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
-            {products.length}
+            {totalProducts || products.length}
           </span>
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === "bundles"}
           onClick={() => setActiveTab("bundles")}
           className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px flex items-center gap-1.5 ${
             activeTab === "bundles"
