@@ -5,31 +5,60 @@ import {
   deliveryScheduleItems,
   orders,
 } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
 import { parseJsonBody, deliveryBodySchema } from "@/lib/validators/api";
+import {
+  buildPaginationMeta,
+  LEGACY_SAFETY_LIMIT,
+  parsePagination,
+} from "@/lib/pagination";
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   const gate = await requirePermissionApi("delivery:read");
   if ("response" in gate) return gate.response;
   const { ctx } = gate;
 
+  const { searchParams } = new URL(request.url);
+  const pagination = parsePagination(searchParams);
+  const whereClause = eq(deliverySchedules.companyId, ctx.companyId);
+
   try {
-    const result = await db.query.deliverySchedules.findMany({
-      where: eq(deliverySchedules.companyId, ctx.companyId),
-      with: {
-        order: {
-          with: {
-            enquiry: true,
-          },
+    if (!pagination) {
+      const result = await db.query.deliverySchedules.findMany({
+        where: whereClause,
+        with: {
+          order: { with: { enquiry: true } },
+          venue: true,
+          items: true,
         },
+        orderBy: desc(deliverySchedules.createdAt),
+        limit: LEGACY_SAFETY_LIMIT,
+      });
+      return NextResponse.json(result);
+    }
+
+    const [{ total }] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(deliverySchedules)
+      .where(whereClause);
+
+    const data = await db.query.deliverySchedules.findMany({
+      where: whereClause,
+      with: {
+        order: { with: { enquiry: true } },
         venue: true,
         items: true,
       },
       orderBy: desc(deliverySchedules.createdAt),
+      limit: pagination.limit,
+      offset: pagination.offset,
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      data,
+      pagination: buildPaginationMeta(pagination, total),
+    });
   } catch (error) {
     console.error(
       "Error fetching delivery schedules:",

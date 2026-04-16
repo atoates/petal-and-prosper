@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { orders, orderItems, enquiries } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, ilike, sql, inArray } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
 import { parseJsonBody, orderCreateSchema } from "@/lib/validators/api";
 import {
@@ -9,22 +9,85 @@ import {
   priceItemForCompany,
   recomputeOrderTotal,
 } from "@/lib/pricing/server";
+import {
+  buildPaginationMeta,
+  LEGACY_SAFETY_LIMIT,
+  parsePagination,
+} from "@/lib/pagination";
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   const gate = await requirePermissionApi("orders:read");
   if ("response" in gate) return gate.response;
   const { ctx } = gate;
 
+  const { searchParams } = new URL(request.url);
+  const q = searchParams.get("q")?.trim() ?? "";
+  const pagination = parsePagination(searchParams);
+
   try {
-    const result = await db.query.orders.findMany({
-      where: eq(orders.companyId, ctx.companyId),
-      with: {
-        enquiry: true,
-      },
+    // Search resolves client names to enquiry IDs in a single
+    // upstream query, then filters orders by that ID set. This lets
+    // us keep the cheap `orders.findMany` path for the common case
+    // while still supporting "search by client name" without
+    // re-building the join into every query.
+    let enquiryIdFilter: string[] | null = null;
+    if (q) {
+      const matches = await db
+        .select({ id: enquiries.id })
+        .from(enquiries)
+        .where(
+          and(
+            eq(enquiries.companyId, ctx.companyId),
+            ilike(enquiries.clientName, `%${q}%`)
+          )
+        );
+      enquiryIdFilter = matches.map((row) => row.id);
+      if (enquiryIdFilter.length === 0) {
+        // Nothing matches -- short-circuit to an empty response in
+        // the right shape instead of issuing a doomed IN (...) query.
+        return pagination
+          ? NextResponse.json({
+              data: [],
+              pagination: buildPaginationMeta(pagination, 0),
+            })
+          : NextResponse.json([]);
+      }
+    }
+
+    const whereClause = enquiryIdFilter
+      ? and(
+          eq(orders.companyId, ctx.companyId),
+          inArray(orders.enquiryId, enquiryIdFilter)
+        )
+      : eq(orders.companyId, ctx.companyId);
+
+    if (!pagination) {
+      const result = await db.query.orders.findMany({
+        where: whereClause,
+        with: { enquiry: true },
+        orderBy: desc(orders.createdAt),
+        limit: LEGACY_SAFETY_LIMIT,
+      });
+      return NextResponse.json(result);
+    }
+
+    const [{ total }] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(orders)
+      .where(whereClause);
+
+    const data = await db.query.orders.findMany({
+      where: whereClause,
+      with: { enquiry: true },
       orderBy: desc(orders.createdAt),
+      limit: pagination.limit,
+      offset: pagination.offset,
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      data,
+      pagination: buildPaginationMeta(pagination, total),
+    });
   } catch (error) {
     console.error(
       "Error fetching orders:",
@@ -116,31 +179,28 @@ export async function POST(request: NextRequest) {
             updatedBy: ctx.userId,
           });
         }
-        // Recompute total from the freshly-inserted items so it
-        // always reflects what the pricing engine produced rather
-        // than whatever totalPrice the client posted.
         await recomputeOrderTotal(tx, orderId, ctx.companyId);
+      }
+
+      // Advance the parent enquiry's progress to "Order" inside the
+      // same transaction. "Order" is the terminal state in the enquiry
+      // funnel, so overwriting unconditionally is correct. Keeping
+      // this inside the transaction means we never have an order
+      // without its parent enquiry advanced, or vice versa.
+      if (data.enquiryId) {
+        await tx
+          .update(enquiries)
+          .set({ progress: "Order", updatedBy: ctx.userId, updatedAt: new Date() })
+          .where(
+            and(
+              eq(enquiries.id, data.enquiryId),
+              eq(enquiries.companyId, ctx.companyId)
+            )
+          );
       }
 
       return orderRow;
     });
-
-    // Auto-advance the parent enquiry's progress to "Order" whenever
-    // an order is created from it. "Order" is the terminal state in
-    // the enquiry funnel, so overwriting unconditionally is correct:
-    // nothing is further along than "an order exists". Tenant
-    // scoping is already guaranteed by the check above.
-    if (data.enquiryId) {
-      await db
-        .update(enquiries)
-        .set({ progress: "Order", updatedBy: ctx.userId, updatedAt: new Date() })
-        .where(
-          and(
-            eq(enquiries.id, data.enquiryId),
-            eq(enquiries.companyId, ctx.companyId)
-          )
-        );
-    }
 
     // Re-fetch so the caller sees the final totalPrice after any
     // item-driven recompute.

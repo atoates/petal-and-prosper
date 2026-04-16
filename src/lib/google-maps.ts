@@ -33,6 +33,28 @@ export interface OptimisedRoute {
 
 const API_KEY = process.env.GOOGLE_MAPS_API_KEY ?? "";
 
+// Google Maps endpoints are usually sub-second. A 10s ceiling means
+// a hung upstream fails fast rather than tying up a server request
+// for the 30s default Next.js route timeout.
+const GOOGLE_MAPS_TIMEOUT_MS = 10_000;
+
+/**
+ * Fetch wrapper that aborts the request if Google Maps doesn't
+ * respond within the configured timeout. The AbortError surfaces to
+ * callers as a regular fetch rejection, which their try/catch maps
+ * to a null return -- so a slow upstream degrades gracefully
+ * instead of stalling the request queue.
+ */
+async function fetchWithTimeout(url: string): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GOOGLE_MAPS_TIMEOUT_MS);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Logs a warning if API key is missing
  */
@@ -80,7 +102,7 @@ export async function geocodeAddress(address: string): Promise<GeocodingResult |
       key: API_KEY,
     });
 
-    const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?${params}`);
+    const response = await fetchWithTimeout(`https://maps.googleapis.com/maps/api/geocode/json?${params}`);
     const data = (await response.json()) as {
       results?: Array<{
         geometry: { location: { lat: number; lng: number } };
@@ -122,7 +144,7 @@ export async function getDistance(
       key: API_KEY,
     });
 
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://maps.googleapis.com/maps/api/distancematrix/json?${params}`
     );
     const data = (await response.json()) as {
@@ -174,7 +196,7 @@ export async function getDistanceMatrix(
       key: API_KEY,
     });
 
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://maps.googleapis.com/maps/api/distancematrix/json?${params}`
     );
     const data = (await response.json()) as {
@@ -239,7 +261,7 @@ export async function optimiseRoute(
       params.append("waypoints", `optimize:true|${waypoints.join("|")}`);
     }
 
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://maps.googleapis.com/maps/api/directions/json?${params}`
     );
     const data = (await response.json()) as {

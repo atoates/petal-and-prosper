@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { enquiries } from "@/lib/db/schema";
-import { and, eq, isNotNull, isNull, desc } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, desc, ilike, or, sql } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
 import { parseJsonBody, enquiryBodySchema } from "@/lib/validators/api";
+import {
+  buildPaginationMeta,
+  LEGACY_SAFETY_LIMIT,
+  parsePagination,
+} from "@/lib/pagination";
 
-// Supported values for ?view=
-//   active   (default) -- only rows where archivedAt IS NULL
-//   archived           -- only rows where archivedAt IS NOT NULL
-//   all                -- both, for places that need the full list
+// Query params:
+//   view=active (default) | archived | all
+//   page, limit -- optional; when either is provided we return
+//                  { data, pagination } instead of a bare array
+//   q           -- optional case-insensitive substring match on
+//                  clientName / clientEmail / eventType
 export async function GET(request: NextRequest) {
   const gate = await requirePermissionApi("enquiries:read");
   if ("response" in gate) return gate.response;
@@ -16,6 +23,8 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const view = searchParams.get("view") ?? "active";
+  const q = searchParams.get("q")?.trim() ?? "";
+  const pagination = parsePagination(searchParams);
 
   try {
     const archiveClause =
@@ -25,16 +34,48 @@ export async function GET(request: NextRequest) {
           ? undefined
           : isNull(enquiries.archivedAt);
 
-    const whereClause = archiveClause
-      ? and(eq(enquiries.companyId, ctx.companyId), archiveClause)
-      : eq(enquiries.companyId, ctx.companyId);
+    const searchClause = q
+      ? or(
+          ilike(enquiries.clientName, `%${q}%`),
+          ilike(enquiries.clientEmail, `%${q}%`),
+          ilike(enquiries.eventType, `%${q}%`)
+        )
+      : undefined;
 
-    const result = await db.query.enquiries.findMany({
+    const whereClause = and(
+      eq(enquiries.companyId, ctx.companyId),
+      archiveClause,
+      searchClause
+    );
+
+    if (!pagination) {
+      // Legacy bare-array response, with a safety cap so a tenant
+      // that has never upgraded its client still can't accidentally
+      // pull 100k rows in a single fetch.
+      const result = await db.query.enquiries.findMany({
+        where: whereClause,
+        orderBy: desc(enquiries.createdAt),
+        limit: LEGACY_SAFETY_LIMIT,
+      });
+      return NextResponse.json(result);
+    }
+
+    const [{ total }] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(enquiries)
+      .where(whereClause);
+
+    const data = await db.query.enquiries.findMany({
       where: whereClause,
       orderBy: desc(enquiries.createdAt),
+      limit: pagination.limit,
+      offset: pagination.offset,
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      data,
+      pagination: buildPaginationMeta(pagination, total),
+    });
   } catch (error) {
     console.error(
       "Error fetching enquiries:",

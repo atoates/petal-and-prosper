@@ -5,10 +5,22 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 
+// Hard ceilings so an upstream stall can't hang a route handler.
+// PDF scans are the slow path; 60s covers a multi-page invoice with
+// comfortable headroom while still short enough to fail a user
+// request rather than pile up connections. Retry once on network
+// blips -- the SDK already backs off exponentially between attempts.
+const ANTHROPIC_TIMEOUT_MS = 60_000;
+const ANTHROPIC_MAX_RETRIES = 1;
+
 const getClient = () => {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error("ANTHROPIC_API_KEY is not set");
-  return new Anthropic({ apiKey: key });
+  return new Anthropic({
+    apiKey: key,
+    timeout: ANTHROPIC_TIMEOUT_MS,
+    maxRetries: ANTHROPIC_MAX_RETRIES,
+  });
 };
 
 export interface ExtractedLineItem {

@@ -1,29 +1,52 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { proposals, orders } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
 import { parseJsonBody, proposalBodySchema } from "@/lib/validators/api";
+import {
+  buildPaginationMeta,
+  LEGACY_SAFETY_LIMIT,
+  parsePagination,
+} from "@/lib/pagination";
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   const gate = await requirePermissionApi("proposals:read");
   if ("response" in gate) return gate.response;
   const { ctx } = gate;
 
+  const { searchParams } = new URL(request.url);
+  const pagination = parsePagination(searchParams);
+  const whereClause = eq(proposals.companyId, ctx.companyId);
+
   try {
-    const result = await db.query.proposals.findMany({
-      where: eq(proposals.companyId, ctx.companyId),
-      with: {
-        order: {
-          with: {
-            enquiry: true,
-          },
-        },
-      },
+    if (!pagination) {
+      const result = await db.query.proposals.findMany({
+        where: whereClause,
+        with: { order: { with: { enquiry: true } } },
+        orderBy: desc(proposals.createdAt),
+        limit: LEGACY_SAFETY_LIMIT,
+      });
+      return NextResponse.json(result);
+    }
+
+    const [{ total }] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(proposals)
+      .where(whereClause);
+
+    const data = await db.query.proposals.findMany({
+      where: whereClause,
+      with: { order: { with: { enquiry: true } } },
       orderBy: desc(proposals.createdAt),
+      limit: pagination.limit,
+      offset: pagination.offset,
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      data,
+      pagination: buildPaginationMeta(pagination, total),
+    });
   } catch (error) {
     console.error(
       "Error fetching proposals:",

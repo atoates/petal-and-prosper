@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import { Info, X, ImageOff } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -54,11 +55,20 @@ function Thumbnail({
     );
   }
 
+  // `unoptimized` keeps the component source-agnostic: product
+  // images come from internal /api routes, OpenAI's CDN, and
+  // occasionally user-pasted URLs, so we skip the Next.js image
+  // optimiser rather than maintain an exhaustive remotePatterns
+  // list. We still get native lazy-loading and explicit dimensions
+  // to prevent layout shift on list pages.
   return (
-    <img
+    <Image
       src={src}
       alt={alt}
       onError={() => setFailed(true)}
+      width={size}
+      height={size}
+      unoptimized
       className={`${rounding} object-cover shrink-0`}
       style={{ width: size, height: size }}
     />
@@ -91,6 +101,7 @@ export function ProductImage({
   thumbnailSize = 32,
 }: ProductImageProps) {
   const [open, setOpen] = useState(false);
+  const [popoverImageFailed, setPopoverImageFailed] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -168,7 +179,10 @@ export function ProductImage({
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          setOpen((prev) => !prev);
+          setOpen((prev) => {
+            if (!prev) setPopoverImageFailed(false);
+            return !prev;
+          });
         }}
         className={
           showThumbnail
@@ -205,36 +219,25 @@ export function ProductImage({
           </button>
 
           {/* Image area */}
-          {imageUrl ? (
+          {imageUrl && !popoverImageFailed ? (
             <div className="w-full aspect-square bg-gray-50 relative overflow-hidden">
-              <img
+              <Image
                 src={imageUrl}
                 alt={name}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  const target = e.currentTarget;
-                  target.style.display = "none";
-                  const parent = target.parentElement;
-                  if (parent) {
-                    parent.classList.add(
-                      "flex",
-                      "items-center",
-                      "justify-center"
-                    );
-                    const placeholder = document.createElement("div");
-                    placeholder.className =
-                      "text-center text-gray-400 px-4";
-                    placeholder.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2 text-gray-300"><line x1="1" y1="1" x2="23" y2="23"/><path d="M21 21H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h18a2 2 0 0 1 2 2v14"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><p class="text-xs">Image unavailable</p>`;
-                    parent.appendChild(placeholder);
-                  }
-                }}
+                fill
+                sizes="288px"
+                unoptimized
+                className="object-cover"
+                onError={() => setPopoverImageFailed(true)}
               />
             </div>
           ) : (
             <div className="w-full aspect-[4/3] bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
               <div className="text-center text-gray-400">
                 <ImageOff size={36} className="mx-auto mb-2 text-gray-300" />
-                <p className="text-xs">No image available</p>
+                <p className="text-xs">
+                  {imageUrl ? "Image unavailable" : "No image available"}
+                </p>
               </div>
             </div>
           )}

@@ -6,29 +6,61 @@ import {
   orderItems,
   invoiceSettings,
 } from "@/lib/db/schema";
-import { eq, and, desc, like } from "drizzle-orm";
+import { eq, and, desc, like, sql, ilike } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
 import { parseJsonBody, invoiceBodySchema } from "@/lib/validators/api";
+import {
+  buildPaginationMeta,
+  LEGACY_SAFETY_LIMIT,
+  parsePagination,
+} from "@/lib/pagination";
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   const gate = await requirePermissionApi("invoices:read");
   if ("response" in gate) return gate.response;
   const { ctx } = gate;
 
+  const { searchParams } = new URL(request.url);
+  const q = searchParams.get("q")?.trim() ?? "";
+  const pagination = parsePagination(searchParams);
+
   try {
-    const result = await db.query.invoices.findMany({
-      where: eq(invoices.companyId, ctx.companyId),
-      with: {
-        order: {
-          with: {
-            enquiry: true,
-          },
-        },
-      },
+    const searchClause = q
+      ? ilike(invoices.invoiceNumber, `%${q}%`)
+      : undefined;
+
+    const whereClause = and(
+      eq(invoices.companyId, ctx.companyId),
+      searchClause
+    );
+
+    if (!pagination) {
+      const result = await db.query.invoices.findMany({
+        where: whereClause,
+        with: { order: { with: { enquiry: true } } },
+        orderBy: desc(invoices.createdAt),
+        limit: LEGACY_SAFETY_LIMIT,
+      });
+      return NextResponse.json(result);
+    }
+
+    const [{ total }] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(invoices)
+      .where(whereClause);
+
+    const data = await db.query.invoices.findMany({
+      where: whereClause,
+      with: { order: { with: { enquiry: true } } },
       orderBy: desc(invoices.createdAt),
+      limit: pagination.limit,
+      offset: pagination.offset,
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      data,
+      pagination: buildPaginationMeta(pagination, total),
+    });
   } catch (error) {
     console.error(
       "Error fetching invoices:",
@@ -43,17 +75,30 @@ export async function GET(_request: NextRequest) {
 
 /**
  * Generate the next per-company invoice number in the `INV-{year}-{0001}`
- * format. We scan existing invoices for this tenant that match the current
- * year prefix, find the highest numeric suffix, and increment. A 4-digit
- * zero-padded suffix gives 9999 invoices/year headroom -- more than enough
- * for a floristry SaaS tenant and cheap to bump later.
+ * format. A 4-digit zero-padded suffix gives 9999 invoices/year
+ * headroom -- more than enough for a floristry SaaS tenant.
+ *
+ * Implementation: a single aggregate query asks Postgres for the max
+ * numeric suffix among matching rows. Only rows whose suffix is purely
+ * numeric are considered (the `~` regex guard), so a manually-edited
+ * invoice number can't wedge auto-numbering. We avoid loading every
+ * invoice row into Node just to find the max.
  */
 async function nextInvoiceNumber(companyId: string): Promise<string> {
   const year = new Date().getUTCFullYear();
   const prefix = `INV-${year}-`;
+  const suffixStart = prefix.length + 1; // Postgres SUBSTRING is 1-indexed
 
-  const existing = await db
-    .select({ invoiceNumber: invoices.invoiceNumber })
+  const [row] = await db
+    .select({
+      maxSeq: sql<number | null>`MAX(
+        CASE
+          WHEN SUBSTRING(${invoices.invoiceNumber} FROM ${suffixStart}) ~ '^[0-9]+$'
+          THEN CAST(SUBSTRING(${invoices.invoiceNumber} FROM ${suffixStart}) AS INTEGER)
+          ELSE NULL
+        END
+      )`,
+    })
     .from(invoices)
     .where(
       and(
@@ -62,13 +107,7 @@ async function nextInvoiceNumber(companyId: string): Promise<string> {
       )
     );
 
-  let maxSeq = 0;
-  for (const row of existing) {
-    const suffix = row.invoiceNumber.slice(prefix.length);
-    const n = parseInt(suffix, 10);
-    if (Number.isFinite(n) && n > maxSeq) maxSeq = n;
-  }
-
+  const maxSeq = row?.maxSeq ?? 0;
   const next = (maxSeq + 1).toString().padStart(4, "0");
   return `${prefix}${next}`;
 }

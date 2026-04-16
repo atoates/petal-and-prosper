@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { contacts } from "@/lib/db/schema";
-import { eq, desc, and, or, ilike } from "drizzle-orm";
+import { eq, desc, and, or, ilike, sql } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
 import { randomUUID } from "crypto";
+import {
+  buildPaginationMeta,
+  LEGACY_SAFETY_LIMIT,
+  parsePagination,
+} from "@/lib/pagination";
 
 export async function GET(request: NextRequest) {
   const gate = await requirePermissionApi("contacts:read");
@@ -13,45 +18,65 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type"); // customer | supplier | both
   const search = searchParams.get("search");
+  const pagination = parsePagination(searchParams);
 
   try {
-    let query = db.query.contacts.findMany({
-      where: and(
-        eq(contacts.companyId, ctx.companyId),
-        type
-          ? type === "customer"
-            ? or(eq(contacts.type, "customer"), eq(contacts.type, "both"))
-            : type === "supplier"
-              ? or(eq(contacts.type, "supplier"), eq(contacts.type, "both"))
-              : eq(contacts.type, type as "customer" | "supplier" | "both")
-          : undefined,
-        search
-          ? or(
-              ilike(contacts.firstName, `%${search}%`),
-              ilike(contacts.lastName, `%${search}%`),
-              ilike(contacts.email, `%${search}%`),
-              ilike(contacts.companyName, `%${search}%`)
-            )
-          : undefined
-      ),
-      with: {
-        enquiries: {
-          columns: { id: true },
-        },
-      },
-      orderBy: [desc(contacts.createdAt)],
-    });
+    const typeClause = type
+      ? type === "customer"
+        ? or(eq(contacts.type, "customer"), eq(contacts.type, "both"))
+        : type === "supplier"
+          ? or(eq(contacts.type, "supplier"), eq(contacts.type, "both"))
+          : eq(contacts.type, type as "customer" | "supplier" | "both")
+      : undefined;
 
-    const result = await query;
+    const searchClause = search
+      ? or(
+          ilike(contacts.firstName, `%${search}%`),
+          ilike(contacts.lastName, `%${search}%`),
+          ilike(contacts.email, `%${search}%`),
+          ilike(contacts.companyName, `%${search}%`)
+        )
+      : undefined;
 
-    // Attach enquiry count to each contact
-    const mapped = result.map((c) => ({
+    const whereClause = and(
+      eq(contacts.companyId, ctx.companyId),
+      typeClause,
+      searchClause
+    );
+
+    const mapRow = <T extends { enquiries?: { id: string }[] }>(c: T) => ({
       ...c,
       enquiryCount: c.enquiries?.length ?? 0,
       enquiries: undefined,
-    }));
+    });
 
-    return NextResponse.json(mapped);
+    if (!pagination) {
+      const result = await db.query.contacts.findMany({
+        where: whereClause,
+        with: { enquiries: { columns: { id: true } } },
+        orderBy: [desc(contacts.createdAt)],
+        limit: LEGACY_SAFETY_LIMIT,
+      });
+      return NextResponse.json(result.map(mapRow));
+    }
+
+    const [{ total }] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(contacts)
+      .where(whereClause);
+
+    const rows = await db.query.contacts.findMany({
+      where: whereClause,
+      with: { enquiries: { columns: { id: true } } },
+      orderBy: [desc(contacts.createdAt)],
+      limit: pagination.limit,
+      offset: pagination.offset,
+    });
+
+    return NextResponse.json({
+      data: rows.map(mapRow),
+      pagination: buildPaginationMeta(pagination, total),
+    });
   } catch (error) {
     console.error(
       "Error fetching contacts:",

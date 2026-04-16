@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import {
   Plus,
   Search,
@@ -23,6 +24,7 @@ import {
 } from "lucide-react";
 import { Can } from "@/components/auth/can";
 import { ContactModal } from "@/components/contacts/contact-modal";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 type ContactType = "customer" | "supplier" | "both";
 type TabFilter = "all" | "customer" | "supplier";
@@ -55,8 +57,23 @@ interface Contact {
   createdAt: string;
 }
 
+interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+const PAGE_SIZE = 50;
+
 export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [pagination, setPagination] = useState<PaginationMeta>({
+    page: 1,
+    limit: PAGE_SIZE,
+    total: 0,
+    totalPages: 1,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -66,26 +83,50 @@ export default function ContactsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [page, setPage] = useState(1);
 
-  const fetchContacts = useCallback(async () => {
-    try {
-      const params = new URLSearchParams();
-      if (activeTab !== "all") params.set("type", activeTab);
-      if (searchTerm) params.set("search", searchTerm);
-      const response = await fetch(`/api/contacts?${params.toString()}`);
-      if (!response.ok) throw new Error("Failed to fetch contacts");
-      const data = await response.json();
-      setContacts(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setLoading(false);
-    }
-  }, [activeTab, searchTerm]);
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
+
+  // Any change to the filter set should drop us back to page 1;
+  // otherwise we can sit on page 4 of an empty result set after
+  // narrowing a search.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, activeTab]);
+
+  const fetchContacts = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        const params = new URLSearchParams({
+          page: String(page),
+          limit: String(PAGE_SIZE),
+        });
+        if (activeTab !== "all") params.set("type", activeTab);
+        if (debouncedSearch) params.set("search", debouncedSearch);
+
+        const response = await fetch(`/api/contacts?${params.toString()}`, {
+          signal,
+        });
+        if (!response.ok) throw new Error("Failed to fetch contacts");
+        const json = await response.json();
+        setContacts(json.data);
+        setPagination(json.pagination);
+        setError(null);
+      } catch (err) {
+        if ((err as { name?: string }).name === "AbortError") return;
+        setError(err instanceof Error ? err.message : "An error occurred");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [activeTab, debouncedSearch, page]
+  );
 
   useEffect(() => {
     setLoading(true);
-    fetchContacts();
+    const controller = new AbortController();
+    fetchContacts(controller.signal);
+    return () => controller.abort();
   }, [fetchContacts]);
 
   const handleOpenModal = (contact?: Contact) => {
@@ -490,6 +531,17 @@ export default function ContactsPage() {
             </table>
           )}
         </div>
+        {!loading && pagination.total > 0 && (
+          <div className="px-6 border-t border-gray-200">
+            <PaginationControls
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              total={pagination.total}
+              limit={pagination.limit}
+              onPageChange={setPage}
+            />
+          </div>
+        )}
       </Card>
 
       <ContactModal

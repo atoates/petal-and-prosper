@@ -1,15 +1,17 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { InlineSelect } from "@/components/ui/inline-select";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Plus, Edit2, Trash2, ExternalLink, Loader2, Search, ChevronUp, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { OrderModal } from "@/components/orders/order-modal";
 import { Can } from "@/components/auth/can";
 import { formatUkDate } from "@/lib/format-date";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import type { OrderStatus } from "@/types/orders";
 
 interface Order {
@@ -26,33 +28,23 @@ interface Order {
   };
 }
 
-// Primary sort for the orders list is the event date on the
-// linked enquiry (ascending, soonest-first), with null event
-// dates bucketed to the end and createdAt (descending) as the
-// tiebreaker. This matches how florists actually work the list:
-// upcoming events first, then anything without a date, then the
-// most recently touched.
-function sortByEventDate(list: Order[]): Order[] {
-  return [...list].sort((a, b) => {
-    const aDate = a.enquiry?.eventDate ?? null;
-    const bDate = b.enquiry?.eventDate ?? null;
-    if (aDate && bDate) {
-      const diff =
-        new Date(aDate).getTime() - new Date(bDate).getTime();
-      if (diff !== 0) return diff;
-    } else if (aDate && !bDate) {
-      return -1;
-    } else if (!aDate && bDate) {
-      return 1;
-    }
-    return (
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-  });
+interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
 }
+
+const PAGE_SIZE = 50;
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [pagination, setPagination] = useState<PaginationMeta>({
+    page: 1,
+    limit: PAGE_SIZE,
+    total: 0,
+    totalPages: 1,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -60,29 +52,61 @@ export default function OrdersPage() {
   // Per-row delete state (#27): prevents double-click and shows a
   // spinner while the DELETE is in flight.
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Per-row status-update guard (#14): same idea as deletingId, but
+  // for inline status flips so a rapid double-click can't fire two
+  // concurrent PUTs on the same order.
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [page, setPage] = useState(1);
   const [sortField, setSortField] = useState<string | null>("eventDate");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
+  // Debounced search term used as the effect dependency; the raw
+  // `searchTerm` keeps the input responsive while we avoid firing a
+  // fetch per keystroke.
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
+
+  // Reset to page 1 whenever the search term meaningfully changes,
+  // otherwise we might sit on page 4 of a now-empty result set.
   useEffect(() => {
-    const fetchOrders = async () => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  const fetchOrders = useCallback(
+    async (signal?: AbortSignal) => {
       try {
         setLoading(true);
-        const response = await fetch("/api/orders");
+        const params = new URLSearchParams({
+          page: String(page),
+          limit: String(PAGE_SIZE),
+        });
+        if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
+
+        const response = await fetch(`/api/orders?${params.toString()}`, {
+          signal,
+        });
         if (!response.ok) {
           throw new Error("Failed to fetch orders");
         }
-        const data = await response.json();
-        setOrders(sortByEventDate(data));
+        const json = await response.json();
+        setOrders(json.data);
+        setPagination(json.pagination);
+        setError(null);
       } catch (err) {
+        if ((err as { name?: string }).name === "AbortError") return;
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
         setLoading(false);
       }
-    };
+    },
+    [page, debouncedSearch]
+  );
 
-    fetchOrders();
-  }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchOrders(controller.signal);
+    return () => controller.abort();
+  }, [fetchOrders]);
 
   // Status pill styling is now handled inline via InlineSelect options.
 
@@ -129,9 +153,7 @@ export default function OrdersPage() {
         }
       }
 
-      const response = await fetch("/api/orders");
-      const data = await response.json();
-      setOrders(sortByEventDate(data));
+      await fetchOrders();
     } catch (err) {
       console.error("Error saving order:", err);
       throw err;
@@ -141,26 +163,33 @@ export default function OrdersPage() {
   // Inline status update -- fetch the full order then PUT it back with
   // the new status. The PUT handler recomputes totals from items, so
   // we preserve items and totalPrice from the server's current state.
+  // statusUpdatingId guards against rapid double-clicks on the select.
   const handleStatusUpdate = async (order: Order, next: OrderStatus) => {
-    const res = await fetch(`/api/orders/${order.id}`);
-    if (!res.ok) throw new Error("Failed to load order");
-    const full = await res.json();
-    const put = await fetch(`/api/orders/${order.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        enquiryId: full.enquiryId,
-        status: next,
-        version: full.version ?? 1,
-        totalPrice: full.totalPrice,
-        items: full.items,
-      }),
-    });
-    if (!put.ok) throw new Error("Failed to update status");
-    setOrders((prev) =>
-      prev.map((o) => (o.id === order.id ? { ...o, status: next } : o))
-    );
-    toast.success("Status updated");
+    if (statusUpdatingId === order.id) return;
+    setStatusUpdatingId(order.id);
+    try {
+      const res = await fetch(`/api/orders/${order.id}`);
+      if (!res.ok) throw new Error("Failed to load order");
+      const full = await res.json();
+      const put = await fetch(`/api/orders/${order.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          enquiryId: full.enquiryId,
+          status: next,
+          version: full.version ?? 1,
+          totalPrice: full.totalPrice,
+          items: full.items,
+        }),
+      });
+      if (!put.ok) throw new Error("Failed to update status");
+      setOrders((prev) =>
+        prev.map((o) => (o.id === order.id ? { ...o, status: next } : o))
+      );
+      toast.success("Status updated");
+    } finally {
+      setStatusUpdatingId(null);
+    }
   };
 
   const handleDeleteOrder = async (id: string) => {
@@ -179,9 +208,7 @@ export default function OrdersPage() {
         throw new Error("Failed to delete order");
       }
 
-      const updatedResponse = await fetch("/api/orders");
-      const data = await updatedResponse.json();
-      setOrders(sortByEventDate(data));
+      await fetchOrders();
     } catch (err) {
       console.error("Error deleting order:", err);
       toast.error("Failed to delete order");
@@ -199,30 +226,14 @@ export default function OrdersPage() {
     }
   };
 
+  // Filtering/pagination/search are server-side now. This useMemo only
+  // sorts the rows already on the current page -- a lightweight UX
+  // nicety that avoids adding sortBy/sortDir to the API surface. If
+  // users need cross-page sort, the server can take over later.
   const displayedOrders = useMemo(() => {
-    let filtered = orders;
+    if (!sortField) return orders;
 
-    // Apply search filter
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter((order) => {
-        const clientName = (order.enquiry?.clientName || "").toLowerCase();
-        const status = order.status.toLowerCase();
-        const eventType = (order.enquiry?.eventType || "").toLowerCase();
-        return (
-          clientName.includes(term) ||
-          status.includes(term) ||
-          eventType.includes(term)
-        );
-      });
-    }
-
-    // Apply sorting
-    if (!sortField) {
-      return filtered;
-    }
-
-    const sorted = [...filtered].sort((a, b) => {
+    return [...orders].sort((a, b) => {
       let aValue: string | number | null;
       let bValue: string | number | null;
 
@@ -234,7 +245,6 @@ export default function OrdersPage() {
         case "eventDate":
           aValue = a.enquiry?.eventDate ? new Date(a.enquiry.eventDate).getTime() : null;
           bValue = b.enquiry?.eventDate ? new Date(b.enquiry.eventDate).getTime() : null;
-          // Handle null dates (sort to end)
           if (aValue === null && bValue === null) return 0;
           if (aValue === null) return 1;
           if (bValue === null) return -1;
@@ -259,21 +269,17 @@ export default function OrdersPage() {
           return 0;
       }
 
-      // String comparison
       if (typeof aValue === "string" && typeof bValue === "string") {
         return sortDirection === "asc"
           ? aValue.localeCompare(bValue)
           : bValue.localeCompare(aValue);
       }
 
-      // Numeric comparison
       if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
       if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
-
-    return sorted;
-  }, [orders, searchTerm, sortField, sortDirection]);
+  }, [orders, sortField, sortDirection]);
 
   return (
     <div>
@@ -299,20 +305,19 @@ export default function OrdersPage() {
       )}
 
       <Card>
-        {!loading && orders.length > 0 && (
-          <div className="px-6 py-3 border-b border-gray-200">
-            <div className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg bg-white">
-              <Search size={16} className="text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by client, status, or event type..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="flex-1 outline-none text-sm bg-transparent text-gray-900 placeholder-gray-500"
-              />
-            </div>
+        <div className="px-6 py-3 border-b border-gray-200">
+          <div className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg bg-white">
+            <Search size={16} className="text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by client name..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="flex-1 outline-none text-sm bg-transparent text-gray-900 placeholder-gray-500"
+              aria-label="Search orders"
+            />
           </div>
-        )}
+        </div>
         <div className="overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center py-12">
@@ -324,8 +329,14 @@ export default function OrdersPage() {
           ) : orders.length === 0 ? (
             <CardBody>
               <div className="flex flex-col items-center justify-center py-12">
-                <p className="text-gray-500 text-lg">No orders yet</p>
-                <p className="text-gray-400 mt-1">Create your first order to get started</p>
+                <p className="text-gray-500 text-lg">
+                  {debouncedSearch
+                    ? "No orders match your search"
+                    : "No orders yet"}
+                </p>
+                {!debouncedSearch && (
+                  <p className="text-gray-400 mt-1">Create your first order to get started</p>
+                )}
               </div>
             </CardBody>
           ) : (
@@ -477,6 +488,17 @@ export default function OrdersPage() {
             </table>
           )}
         </div>
+        {!loading && pagination.total > 0 && (
+          <div className="px-6 border-t border-gray-200">
+            <PaginationControls
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              total={pagination.total}
+              limit={pagination.limit}
+              onPageChange={setPage}
+            />
+          </div>
+        )}
       </Card>
 
       <OrderModal

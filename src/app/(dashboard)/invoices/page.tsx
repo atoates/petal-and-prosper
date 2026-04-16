@@ -1,15 +1,17 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { UkDateInput } from "@/components/ui/uk-date-input";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Plus, Download, CreditCard, Loader2, Search, ChevronUp, ChevronDown } from "lucide-react";
 import { InlineSelect } from "@/components/ui/inline-select";
 import { Can } from "@/components/auth/can";
 import { formatUkDate } from "@/lib/format-date";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 interface Invoice {
   id: string;
@@ -61,8 +63,23 @@ const formatPrice = (amount: string | number): string => {
   return num.toFixed(2);
 };
 
+interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+const PAGE_SIZE = 50;
+
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [pagination, setPagination] = useState<PaginationMeta>({
+    page: 1,
+    limit: PAGE_SIZE,
+    total: 0,
+    totalPages: 1,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -82,6 +99,13 @@ export default function InvoicesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [page, setPage] = useState(1);
+
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
   // Payment recording modal state. When `paymentInvoice` is set, the
   // modal renders with that invoice preloaded. We track the form
@@ -92,25 +116,40 @@ export default function InvoicesPage() {
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchInvoices = async () => {
+  const fetchInvoices = useCallback(
+    async (signal?: AbortSignal) => {
       try {
         setLoading(true);
-        const response = await fetch("/api/invoices");
+        const params = new URLSearchParams({
+          page: String(page),
+          limit: String(PAGE_SIZE),
+        });
+        if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
+        const response = await fetch(`/api/invoices?${params.toString()}`, {
+          signal,
+        });
         if (!response.ok) {
           throw new Error("Failed to fetch invoices");
         }
-        const data = await response.json();
-        setInvoices(data);
+        const json = await response.json();
+        setInvoices(json.data);
+        setPagination(json.pagination);
+        setError(null);
       } catch (err) {
+        if ((err as { name?: string }).name === "AbortError") return;
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
         setLoading(false);
       }
-    };
+    },
+    [debouncedSearch, page]
+  );
 
-    fetchInvoices();
-  }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchInvoices(controller.signal);
+    return () => controller.abort();
+  }, [fetchInvoices]);
 
   const fetchOrders = async () => {
     try {
@@ -200,9 +239,9 @@ export default function InvoicesPage() {
         throw new Error(errorData.message || "Failed to create invoice");
       }
 
-      const newInvoice = await response.json();
-      setInvoices((prev) => [newInvoice, ...prev]);
+      await response.json();
       handleCloseCreateModal();
+      await fetchInvoices();
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -313,54 +352,49 @@ export default function InvoicesPage() {
     }
   };
 
+  // Search/pagination happen server-side. We only sort the rows
+  // already on the current page -- cross-page sort would require
+  // pushing sortBy/sortDir into the API, which we can add if users
+  // ask.
   const displayedInvoices = useMemo(() => {
-    let filtered = invoices.filter((invoice) => {
-      const invoiceNum = invoice.invoiceNumber.toLowerCase();
-      const clientName = (invoice.order?.enquiry?.clientName || "").toLowerCase();
-      const status = invoice.status.toLowerCase();
-      const search = searchTerm.toLowerCase();
-      return invoiceNum.includes(search) || clientName.includes(search) || status.includes(search);
+    if (!sortField) return invoices;
+
+    return [...invoices].sort((a, b) => {
+      let aValue: string | number = "";
+      let bValue: string | number = "";
+
+      switch (sortField) {
+        case "invoiceNumber":
+          aValue = a.invoiceNumber.toLowerCase();
+          bValue = b.invoiceNumber.toLowerCase();
+          break;
+        case "client":
+          aValue = (a.order?.enquiry?.clientName || "").toLowerCase();
+          bValue = (b.order?.enquiry?.clientName || "").toLowerCase();
+          break;
+        case "status":
+          aValue = a.status.toLowerCase();
+          bValue = b.status.toLowerCase();
+          break;
+        case "totalAmount":
+          aValue = parseFloat(a.totalAmount) || 0;
+          bValue = parseFloat(b.totalAmount) || 0;
+          break;
+        case "dueDate":
+          aValue = a.dueDate || "";
+          bValue = b.dueDate || "";
+          break;
+        case "paidDate":
+          aValue = a.paidAt || "";
+          bValue = b.paidAt || "";
+          break;
+      }
+
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
     });
-
-    if (sortField) {
-      filtered.sort((a, b) => {
-        let aValue: string | number = "";
-        let bValue: string | number = "";
-
-        switch (sortField) {
-          case "invoiceNumber":
-            aValue = a.invoiceNumber.toLowerCase();
-            bValue = b.invoiceNumber.toLowerCase();
-            break;
-          case "client":
-            aValue = (a.order?.enquiry?.clientName || "").toLowerCase();
-            bValue = (b.order?.enquiry?.clientName || "").toLowerCase();
-            break;
-          case "status":
-            aValue = a.status.toLowerCase();
-            bValue = b.status.toLowerCase();
-            break;
-          case "totalAmount":
-            aValue = parseFloat(a.totalAmount) || 0;
-            bValue = parseFloat(b.totalAmount) || 0;
-            break;
-          case "dueDate":
-            aValue = a.dueDate || "";
-            bValue = b.dueDate || "";
-            break;
-          case "paidDate":
-            aValue = a.paidAt || "";
-            bValue = b.paidAt || "";
-            break;
-        }
-
-        if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
-        if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
-        return 0;
-      });
-    }
-    return filtered;
-  }, [invoices, searchTerm, sortField, sortDirection]);
+  }, [invoices, sortField, sortDirection]);
 
 
   return (
@@ -407,7 +441,11 @@ export default function InvoicesPage() {
             </div>
           ) : displayedInvoices.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-600">No invoices found. Create your first invoice to get started.</p>
+              <p className="text-gray-600">
+                {debouncedSearch
+                  ? "No invoices match your search."
+                  : "No invoices found. Create your first invoice to get started."}
+              </p>
             </div>
           ) : (
             <table className="w-full">
@@ -551,6 +589,17 @@ export default function InvoicesPage() {
             </table>
           )}
         </CardBody>
+        {!loading && pagination.total > 0 && (
+          <div className="px-6 border-t border-gray-200">
+            <PaginationControls
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              total={pagination.total}
+              limit={pagination.limit}
+              onPageChange={setPage}
+            />
+          </div>
+        )}
       </Card>
 
       {showCreateModal && (

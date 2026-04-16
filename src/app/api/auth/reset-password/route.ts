@@ -53,6 +53,14 @@ export async function POST(request: NextRequest) {
   const { token, password } = parsed.data;
   const tokenHash = hashToken(token);
 
+  // Single generic error for all token-failure modes (not-found,
+  // already-used, expired). Distinguishing them in the response lets
+  // an attacker enumerate which token strings are real or figure out
+  // the TTL by probing, so we collapse them into one user-facing
+  // message.
+  const INVALID_TOKEN_ERROR =
+    "This reset link is invalid or has expired. Please request a new one.";
+
   try {
     const row = await db.query.passwordResetTokens.findFirst({
       where: and(
@@ -61,16 +69,9 @@ export async function POST(request: NextRequest) {
       ),
     });
 
-    if (!row) {
+    if (!row || row.expiresAt.getTime() < Date.now()) {
       return NextResponse.json(
-        { error: "This reset link is invalid or has already been used." },
-        { status: 400 }
-      );
-    }
-
-    if (row.expiresAt.getTime() < Date.now()) {
-      return NextResponse.json(
-        { error: "This reset link has expired. Please request a new one." },
+        { error: INVALID_TOKEN_ERROR },
         { status: 400 }
       );
     }

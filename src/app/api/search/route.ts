@@ -9,7 +9,7 @@ import {
   proposals,
   deliverySchedules,
 } from "@/lib/db/schema";
-import { eq, ilike, or, and, sql } from "drizzle-orm";
+import { eq, ilike, or, and } from "drizzle-orm";
 import { formatUkDate } from "@/lib/format-date";
 
 interface SearchResult {
@@ -71,22 +71,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Search orders (via enquiry's clientName)
+    // Search orders (via enquiry's clientName). We pull clientName
+    // from the same join rather than re-querying enquiries per row
+    // (was an N+1 before).
     if (!category || category === "order") {
       const orderResults = await db
         .select({
           id: orders.id,
-          enquiryId: orders.enquiryId,
           status: orders.status,
+          clientName: enquiries.clientName,
         })
         .from(orders)
-        .leftJoin(enquiries, eq(orders.enquiryId, enquiries.id))
+        .innerJoin(enquiries, eq(orders.enquiryId, enquiries.id))
         .where(
           and(
             eq(orders.companyId, ctx.companyId),
-            enquiries.id
-              ? ilike(enquiries.clientName, searchPattern)
-              : sql`false`
+            ilike(enquiries.clientName, searchPattern)
           )
         )
         .limit(5);
@@ -95,27 +95,11 @@ export async function GET(request: NextRequest) {
         ...orderResults.map((row) => ({
           id: row.id,
           type: "order" as const,
-          title: "",
+          title: row.clientName,
           subtitle: `Order - ${row.status || ""}`,
           url: `/orders/${row.id}`,
         }))
       );
-
-      // Fill in client names for orders
-      for (const order of orderResults) {
-        if (order.enquiryId) {
-          const enquiryData = await db
-            .select({ clientName: enquiries.clientName })
-            .from(enquiries)
-            .where(eq(enquiries.id, order.enquiryId))
-            .limit(1);
-
-          const result = results.find((r) => r.id === order.id);
-          if (result && enquiryData.length > 0) {
-            result.title = enquiryData[0].clientName;
-          }
-        }
-      }
     }
 
     // Search contacts
@@ -182,23 +166,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Search proposals (via related order/enquiry clientName)
+    // Search proposals (via related order/enquiry clientName). One
+    // join chain, no second fan-out per row.
     if (!category || category === "proposal") {
       const proposalResults = await db
         .select({
           id: proposals.id,
-          orderId: proposals.orderId,
           status: proposals.status,
+          clientName: enquiries.clientName,
         })
         .from(proposals)
-        .leftJoin(orders, eq(proposals.orderId, orders.id))
-        .leftJoin(enquiries, eq(orders.enquiryId, enquiries.id))
+        .innerJoin(orders, eq(proposals.orderId, orders.id))
+        .innerJoin(enquiries, eq(orders.enquiryId, enquiries.id))
         .where(
           and(
             eq(proposals.companyId, ctx.companyId),
-            enquiries.id
-              ? ilike(enquiries.clientName, searchPattern)
-              : sql`false`
+            ilike(enquiries.clientName, searchPattern)
           )
         )
         .limit(5);
@@ -207,46 +190,24 @@ export async function GET(request: NextRequest) {
         ...proposalResults.map((row) => ({
           id: row.id,
           type: "proposal" as const,
-          title: "",
+          title: row.clientName,
           subtitle: `Proposal - ${row.status || "draft"}`,
           url: "/proposals",
         }))
       );
-
-      // Fill in client names for proposals
-      for (const proposal of proposalResults) {
-        if (proposal.orderId) {
-          const orderData = await db
-            .select({ enquiryId: orders.enquiryId })
-            .from(orders)
-            .where(eq(orders.id, proposal.orderId))
-            .limit(1);
-
-          if (orderData.length > 0 && orderData[0].enquiryId) {
-            const enquiryData = await db
-              .select({ clientName: enquiries.clientName })
-              .from(enquiries)
-              .where(eq(enquiries.id, orderData[0].enquiryId))
-              .limit(1);
-
-            const result = results.find((r) => r.id === proposal.id);
-            if (result && enquiryData.length > 0) {
-              result.title = enquiryData[0].clientName;
-            }
-          }
-        }
-      }
     }
 
-    // Search delivery schedules (via related order/enquiry or deliveryAddress)
+    // Search delivery schedules (via related order/enquiry or
+    // deliveryAddress). We keep leftJoin here because a delivery can
+    // be matched by its address alone, without a linked order.
     if (!category || category === "delivery") {
       const deliveryResults = await db
         .select({
           id: deliverySchedules.id,
-          orderId: deliverySchedules.orderId,
           deliveryDate: deliverySchedules.deliveryDate,
           deliveryAddress: deliverySchedules.deliveryAddress,
           status: deliverySchedules.status,
+          clientName: enquiries.clientName,
         })
         .from(deliverySchedules)
         .leftJoin(orders, eq(deliverySchedules.orderId, orders.id))
@@ -266,35 +227,11 @@ export async function GET(request: NextRequest) {
         ...deliveryResults.map((row) => ({
           id: row.id,
           type: "delivery" as const,
-          title: "",
+          title: row.clientName ?? row.deliveryAddress ?? "",
           subtitle: `${formatUkDate(row.deliveryDate, undefined, "")} - ${row.status || "pending"}`,
           url: "/delivery",
         }))
       );
-
-      // Fill in client names for deliveries
-      for (const delivery of deliveryResults) {
-        if (delivery.orderId) {
-          const orderData = await db
-            .select({ enquiryId: orders.enquiryId })
-            .from(orders)
-            .where(eq(orders.id, delivery.orderId))
-            .limit(1);
-
-          if (orderData.length > 0 && orderData[0].enquiryId) {
-            const enquiryData = await db
-              .select({ clientName: enquiries.clientName })
-              .from(enquiries)
-              .where(eq(enquiries.id, orderData[0].enquiryId))
-              .limit(1);
-
-            const result = results.find((r) => r.id === delivery.id);
-            if (result && enquiryData.length > 0) {
-              result.title = enquiryData[0].clientName;
-            }
-          }
-        }
-      }
     }
 
     return NextResponse.json(results);
