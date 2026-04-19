@@ -44,7 +44,15 @@ export function ProposalVersionsTimeline({
     try {
       setLoading(true);
       const res = await fetch(`/api/proposals/${proposalId}/versions`);
-      if (!res.ok) throw new Error("Failed to load versions");
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        const serverMsg = body?.detail || body?.error;
+        throw new Error(
+          serverMsg
+            ? `Failed to load versions: ${serverMsg}`
+            : "Failed to load versions"
+        );
+      }
       setVersions(await res.json());
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Load failed");

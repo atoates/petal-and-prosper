@@ -24,24 +24,42 @@ export async function GET(
   if ("response" in gate) return gate.response;
   const { ctx } = gate;
 
-  // Tenant check -- don't leak another company's proposal's images.
-  const parent = await db.query.proposals.findFirst({
-    where: and(
-      eq(proposals.id, params.id),
-      eq(proposals.companyId, ctx.companyId)
-    ),
-    columns: { id: true },
-  });
-  if (!parent) {
-    return NextResponse.json({ error: "Proposal not found" }, { status: 404 });
+  try {
+    // Tenant check -- don't leak another company's proposal's images.
+    const parent = await db.query.proposals.findFirst({
+      where: and(
+        eq(proposals.id, params.id),
+        eq(proposals.companyId, ctx.companyId)
+      ),
+      columns: { id: true },
+    });
+    if (!parent) {
+      return NextResponse.json({ error: "Proposal not found" }, { status: 404 });
+    }
+
+    const rows = await db
+      .select({
+        id: proposalMoodBoardImages.id,
+        proposalId: proposalMoodBoardImages.proposalId,
+        url: proposalMoodBoardImages.url,
+        caption: proposalMoodBoardImages.caption,
+        position: proposalMoodBoardImages.position,
+        createdBy: proposalMoodBoardImages.createdBy,
+        createdAt: proposalMoodBoardImages.createdAt,
+      })
+      .from(proposalMoodBoardImages)
+      .where(eq(proposalMoodBoardImages.proposalId, params.id))
+      .orderBy(asc(proposalMoodBoardImages.position));
+
+    return NextResponse.json(rows);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "unknown";
+    console.error("Error loading mood board:", detail);
+    return NextResponse.json(
+      { error: "Failed to load mood board", detail },
+      { status: 500 }
+    );
   }
-
-  const rows = await db.query.proposalMoodBoardImages.findMany({
-    where: eq(proposalMoodBoardImages.proposalId, params.id),
-    orderBy: asc(proposalMoodBoardImages.position),
-  });
-
-  return NextResponse.json(rows);
 }
 
 /**

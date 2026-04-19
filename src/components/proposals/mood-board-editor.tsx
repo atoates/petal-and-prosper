@@ -41,7 +41,15 @@ export function MoodBoardEditor({ proposalId, readOnly = false }: Props) {
     try {
       setLoading(true);
       const res = await fetch(`/api/proposals/${proposalId}/mood-board`);
-      if (!res.ok) throw new Error("Failed to load mood board");
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        const serverMsg = body?.detail || body?.error;
+        throw new Error(
+          serverMsg
+            ? `Failed to load mood board: ${serverMsg}`
+            : "Failed to load mood board"
+        );
+      }
       setImages(await res.json());
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Load failed");

@@ -24,11 +24,23 @@ export async function GET(
   if ("response" in gate) return gate.response;
   const { ctx } = gate;
 
-  const rows = await listProposalVersions(db, params.id, ctx.companyId);
-  if (rows === null) {
-    return NextResponse.json({ error: "Proposal not found" }, { status: 404 });
+  try {
+    const rows = await listProposalVersions(db, params.id, ctx.companyId);
+    if (rows === null) {
+      return NextResponse.json(
+        { error: "Proposal not found" },
+        { status: 404 }
+      );
+    }
+    return NextResponse.json(rows);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "unknown";
+    console.error("Error loading proposal versions:", detail);
+    return NextResponse.json(
+      { error: "Failed to load versions", detail },
+      { status: 500 }
+    );
   }
-  return NextResponse.json(rows);
 }
 
 /**

@@ -236,6 +236,10 @@ export async function pinProposalVersion(
  * Tenant-scoped helper for the list UI: returns all versions for a
  * proposal, newest first, including change summaries but without
  * the heavy snapshot_json column unless the caller asks.
+ *
+ * Uses core `select()` rather than `db.query.*` so it works even if
+ * the relational metadata for proposalVersions isn't fully
+ * registered (happens during a partial deploy).
  */
 export async function listProposalVersions(
   tx: Tx,
@@ -243,26 +247,31 @@ export async function listProposalVersions(
   companyId: string,
   opts: { includeSnapshot?: boolean } = {}
 ) {
-  const parent = await (tx as typeof dbType).query.proposals.findFirst({
-    where: and(eq(proposals.id, proposalId), eq(proposals.companyId, companyId)),
-    columns: { id: true },
-  });
+  const [parent] = await (tx as typeof dbType)
+    .select({ id: proposals.id })
+    .from(proposals)
+    .where(and(eq(proposals.id, proposalId), eq(proposals.companyId, companyId)))
+    .limit(1);
   if (!parent) return null;
 
-  const columns = opts.includeSnapshot
-    ? undefined
-    : {
-        id: true as const,
-        proposalId: true as const,
-        versionNumber: true as const,
-        changeSummary: true as const,
-        createdBy: true as const,
-        createdAt: true as const,
-      };
+  if (opts.includeSnapshot) {
+    return (tx as typeof dbType)
+      .select()
+      .from(proposalVersions)
+      .where(eq(proposalVersions.proposalId, proposalId))
+      .orderBy(desc(proposalVersions.versionNumber));
+  }
 
-  return await (tx as typeof dbType).query.proposalVersions.findMany({
-    where: eq(proposalVersions.proposalId, proposalId),
-    orderBy: desc(proposalVersions.versionNumber),
-    columns,
-  });
+  return (tx as typeof dbType)
+    .select({
+      id: proposalVersions.id,
+      proposalId: proposalVersions.proposalId,
+      versionNumber: proposalVersions.versionNumber,
+      changeSummary: proposalVersions.changeSummary,
+      createdBy: proposalVersions.createdBy,
+      createdAt: proposalVersions.createdAt,
+    })
+    .from(proposalVersions)
+    .where(eq(proposalVersions.proposalId, proposalId))
+    .orderBy(desc(proposalVersions.versionNumber));
 }
