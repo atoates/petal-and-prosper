@@ -35,6 +35,9 @@ import {
   orderItems,
   productionSchedules,
   productionScheduleItems,
+  products,
+  wholesaleOrders,
+  wholesaleOrderItems,
 } from "@/lib/db/schema";
 
 type Tx =
@@ -108,4 +111,142 @@ export async function autoGenerateProductionSchedule(
   }
 
   return scheduleId;
+}
+
+/**
+ * Create wholesale orders for a confirmed order if none exist. The
+ * order's line items are matched to the tenant's product library
+ * (by case-insensitive name), grouped by the product's `supplier`
+ * column, and written as one wholesale_order per supplier.
+ *
+ * Items that don't match any product (ad-hoc lines typed into the
+ * quote without picking from the library) fall into an explicit
+ * "Unassigned" bucket. We never silently drop an item -- the florist
+ * can see exactly which lines need manual triage.
+ *
+ * Returns the created wholesale_order ids, or `[]` if nothing was
+ * created (idempotent re-run or order with zero items).
+ *
+ * Limitations / follow-ups:
+ *   - Matching is by description string, not FK. Adding
+ *     order_items.product_id would tighten this but needs a schema
+ *     migration + changes to the order editor.
+ *   - Bundles aren't exploded. We rely on the order modal to already
+ *     have persisted bundle children as separate order_items rows,
+ *     which it does today.
+ */
+export async function autoGenerateWholesaleOrders(
+  tx: Tx,
+  ctx: HookContext
+): Promise<string[]> {
+  // Idempotency: don't touch an order that already has wholesale rows.
+  const existing = await (tx as typeof dbType).query.wholesaleOrders.findFirst({
+    where: and(
+      eq(wholesaleOrders.orderId, ctx.orderId),
+      eq(wholesaleOrders.companyId, ctx.companyId)
+    ),
+    columns: { id: true },
+  });
+  if (existing) return [];
+
+  const items = await (tx as typeof dbType)
+    .select()
+    .from(orderItems)
+    .where(eq(orderItems.orderId, ctx.orderId));
+
+  if (items.length === 0) return [];
+
+  // Pull the tenant's products once so we match without issuing
+  // O(n) lookups. Case-folded name -> { supplier, productId, cost }.
+  const tenantProducts = await (tx as typeof dbType)
+    .select({
+      id: products.id,
+      name: products.name,
+      supplier: products.supplier,
+      wholesalePrice: products.wholesalePrice,
+    })
+    .from(products)
+    .where(eq(products.companyId, ctx.companyId));
+
+  const byName = new Map<
+    string,
+    {
+      id: string;
+      supplier: string | null;
+      wholesalePrice: string | null;
+    }
+  >();
+  for (const p of tenantProducts) {
+    byName.set(p.name.trim().toLowerCase(), {
+      id: p.id,
+      supplier: p.supplier,
+      wholesalePrice: p.wholesalePrice,
+    });
+  }
+
+  // Group order items by supplier. Empty/missing supplier -> "Unassigned"
+  // so the florist sees every line somewhere.
+  interface GroupLine {
+    description: string;
+    category: string | null;
+    quantity: number;
+    unitPrice: string | null;
+    productId: string | null;
+    notes: string | null;
+  }
+  const bySupplier = new Map<string, GroupLine[]>();
+
+  for (const item of items) {
+    const match = byName.get(item.description.trim().toLowerCase());
+    const supplier =
+      match?.supplier && match.supplier.trim().length > 0
+        ? match.supplier
+        : "Unassigned";
+    const line: GroupLine = {
+      description: item.description,
+      category: item.category,
+      quantity: item.quantity,
+      // Prefer the product's wholesale price (cost); fall back to the
+      // order item's baseCost so we at least have a cost number to
+      // show the florist when the library is incomplete.
+      unitPrice: match?.wholesalePrice ?? item.baseCost ?? null,
+      productId: match?.id ?? null,
+      notes: item.bundleName ? `From bundle: ${item.bundleName}` : null,
+    };
+    const existing = bySupplier.get(supplier);
+    if (existing) existing.push(line);
+    else bySupplier.set(supplier, [line]);
+  }
+
+  // Write one wholesale_order header per supplier, then its items.
+  const createdIds: string[] = [];
+  for (const [supplier, lines] of bySupplier) {
+    const wholesaleOrderId = crypto.randomUUID();
+    await (tx as typeof dbType).insert(wholesaleOrders).values({
+      id: wholesaleOrderId,
+      orderId: ctx.orderId,
+      companyId: ctx.companyId,
+      supplier,
+      status: "pending",
+      createdBy: ctx.userId,
+      updatedBy: ctx.userId,
+    });
+
+    await (tx as typeof dbType).insert(wholesaleOrderItems).values(
+      lines.map((line) => ({
+        id: crypto.randomUUID(),
+        wholesaleOrderId,
+        productId: line.productId,
+        description: line.description,
+        category: line.category,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        notes: line.notes,
+      }))
+    );
+
+    createdIds.push(wholesaleOrderId);
+  }
+
+  return createdIds;
 }

@@ -9,7 +9,10 @@ import {
   priceItemForCompany,
   recomputeOrderTotal,
 } from "@/lib/pricing/server";
-import { autoGenerateProductionSchedule } from "@/lib/order-confirm-hooks";
+import {
+  autoGenerateProductionSchedule,
+  autoGenerateWholesaleOrders,
+} from "@/lib/order-confirm-hooks";
 
 export async function GET(
   _request: NextRequest,
@@ -208,11 +211,13 @@ export async function PUT(
         data.status === "confirmed" &&
         previous.status !== "confirmed"
       ) {
-        await autoGenerateProductionSchedule(tx, {
+        const hookCtx = {
           orderId: params.id,
           companyId: ctx.companyId,
           userId: ctx.userId,
-        });
+        };
+        await autoGenerateProductionSchedule(tx, hookCtx);
+        await autoGenerateWholesaleOrders(tx, hookCtx);
       }
 
       return tx.query.orders.findFirst({

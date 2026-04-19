@@ -14,7 +14,10 @@ import {
   LEGACY_SAFETY_LIMIT,
   parsePagination,
 } from "@/lib/pagination";
-import { autoGenerateProductionSchedule } from "@/lib/order-confirm-hooks";
+import {
+  autoGenerateProductionSchedule,
+  autoGenerateWholesaleOrders,
+} from "@/lib/order-confirm-hooks";
 
 export async function GET(request: NextRequest) {
   const gate = await requirePermissionApi("orders:read");
@@ -204,11 +207,13 @@ export async function POST(request: NextRequest) {
       // created directly in 'confirmed' (rare but supported, e.g.
       // importing a historical order that already went out the door).
       if (data.status === "confirmed") {
-        await autoGenerateProductionSchedule(tx, {
+        const hookCtx = {
           orderId,
           companyId: ctx.companyId,
           userId: ctx.userId,
-        });
+        };
+        await autoGenerateProductionSchedule(tx, hookCtx);
+        await autoGenerateWholesaleOrders(tx, hookCtx);
       }
 
       return orderRow;
