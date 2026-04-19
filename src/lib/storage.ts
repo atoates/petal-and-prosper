@@ -1,10 +1,16 @@
-import "server-only";
-
 import {
   DeleteObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
+
+// Note: we intentionally don't use `import "server-only"` here. The
+// one-off scripts in `scripts/` need to import this module outside a
+// Next.js context (via tsx), and `server-only` throws synchronously
+// when evaluated outside a server component. The R2 credentials come
+// from server-only environment variables, so a client-bundle import
+// would still fail loudly at call time -- just at call time instead
+// of build time.
 
 /**
  * Cloudflare R2 storage for image assets (product photos, mood board

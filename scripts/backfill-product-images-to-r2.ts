@@ -18,6 +18,14 @@
  * PNGs). A tenant with 300 products finishes in ~3 minutes.
  */
 
+// Load `.env` for DATABASE_URL + R2_* without requiring the caller
+// to export them first. Silent fail-over when there's no file.
+try {
+  process.loadEnvFile(".env");
+} catch {
+  // no .env -- env vars must already be in the process environment
+}
+
 import { Pool } from "pg";
 import { buildImageKey, uploadObject } from "../src/lib/storage";
 
