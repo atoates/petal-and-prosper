@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { InlineSelect } from "@/components/ui/inline-select";
 import { PaginationControls } from "@/components/ui/pagination-controls";
-import { Plus, Edit2, Trash2, ExternalLink, Loader2, Search, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Edit2, Trash2, ExternalLink, Loader2, Search, ChevronUp, ChevronDown, Copy } from "lucide-react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { OrderModal } from "@/components/orders/order-modal";
 import { Can } from "@/components/auth/can";
@@ -56,7 +57,9 @@ export default function OrdersPage() {
   // for inline status flips so a rapid double-click can't fire two
   // concurrent PUTs on the same order.
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const router = useRouter();
   const [page, setPage] = useState(1);
   const [sortField, setSortField] = useState<string | null>("eventDate");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -214,6 +217,33 @@ export default function OrdersPage() {
       toast.error("Failed to delete order");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleDuplicateOrder = async (id: string) => {
+    if (duplicatingId) return;
+    setDuplicatingId(id);
+    try {
+      // No body -> defaults to null enquiry + re-price at current
+      // rules. Landing on the new order's detail page is the right
+      // next step: the florist typically wants to reassign the
+      // client, tweak quantities, and save.
+      const response = await fetch(`/api/orders/${id}/duplicate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error ?? "Failed to duplicate order");
+      }
+      const created = await response.json();
+      toast.success("Order duplicated. Review and assign a client.");
+      router.push(`/orders/${created.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Duplicate failed");
+    } finally {
+      setDuplicatingId(null);
     }
   };
 
@@ -464,6 +494,22 @@ export default function OrdersPage() {
                         >
                           <Edit2 size={16} />
                         </button>
+                        <Can permission="orders:create">
+                          <button
+                            type="button"
+                            onClick={() => handleDuplicateOrder(order.id)}
+                            disabled={duplicatingId === order.id}
+                            className="p-1 text-gray-600 hover:text-[#1B4332] hover:bg-gray-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Duplicate order"
+                            aria-label="Duplicate order"
+                          >
+                            {duplicatingId === order.id ? (
+                              <Loader2 size={16} className="animate-spin" />
+                            ) : (
+                              <Copy size={16} />
+                            )}
+                          </button>
+                        </Can>
                         <Can permission="orders:delete">
                           <button
                             type="button"
