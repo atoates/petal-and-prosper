@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { proposals } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
+import { proposals, proposalMoodBoardImages } from "@/lib/db/schema";
+import { and } from "drizzle-orm";
 import { requirePermissionApi } from "@/lib/auth/permissions-api";
 import { parseJsonBody, proposalBodySchema } from "@/lib/validators/api";
 
@@ -15,6 +16,10 @@ export async function GET(
   const { id } = await params;
 
   try {
+    // Load the proposal + order + enquiry via the relational query.
+    // Mood board images are fetched separately below so that a broken
+    // relation (e.g. mid-migration) can't take down the proposal
+    // detail page -- we degrade to an empty board rather than 500.
     const proposal = await db.query.proposals.findFirst({
       where: and(
         eq(proposals.id, id),
@@ -26,7 +31,6 @@ export async function GET(
             enquiry: true,
           },
         },
-        moodBoardImages: true,
       },
     });
     if (!proposal) {
@@ -36,14 +40,39 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(proposal);
+    let moodBoardImages: Array<{
+      id: string;
+      url: string;
+      caption: string | null;
+      position: number;
+    }> = [];
+    try {
+      moodBoardImages = await db
+        .select({
+          id: proposalMoodBoardImages.id,
+          url: proposalMoodBoardImages.url,
+          caption: proposalMoodBoardImages.caption,
+          position: proposalMoodBoardImages.position,
+        })
+        .from(proposalMoodBoardImages)
+        .where(eq(proposalMoodBoardImages.proposalId, proposal.id))
+        .orderBy(asc(proposalMoodBoardImages.position));
+    } catch (err) {
+      // Mood board table may not exist yet in very old DBs, or the
+      // relation could temporarily fail during a migration. Don't
+      // let that bring the whole proposal view down.
+      console.warn(
+        "Mood board fetch failed, returning empty:",
+        err instanceof Error ? err.message : err
+      );
+    }
+
+    return NextResponse.json({ ...proposal, moodBoardImages });
   } catch (error) {
-    console.error(
-      "Error fetching proposal:",
-      error instanceof Error ? error.message : "unknown"
-    );
+    const detail = error instanceof Error ? error.message : "unknown";
+    console.error("Error fetching proposal:", detail);
     return NextResponse.json(
-      { error: "Failed to fetch proposal" },
+      { error: "Failed to fetch proposal", detail },
       { status: 500 }
     );
   }

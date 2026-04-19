@@ -60,7 +60,18 @@ export default function ProposalDetailPage() {
     try {
       setLoading(true);
       const res = await fetch(`/api/proposals/${params.id}`);
-      if (!res.ok) throw new Error("Failed to load proposal");
+      if (!res.ok) {
+        // Surface the server's `detail` field so a 500 doesn't vanish
+        // into a generic "Failed to load" -- much easier to diagnose
+        // from the browser.
+        const body = await res.json().catch(() => null);
+        const serverMsg = body?.detail || body?.error;
+        throw new Error(
+          serverMsg
+            ? `Failed to load proposal: ${serverMsg}`
+            : "Failed to load proposal"
+        );
+      }
       setProposal(await res.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
